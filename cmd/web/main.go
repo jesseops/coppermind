@@ -6,9 +6,17 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+    "github.com/jesseops/coppermind/internal/app/services"
 )
 
 func main() {
+    container := services.NewContainer()
+    defer func() {
+        if err := container.Shutdown(); err != nil {
+            container.WebServer.Logger.Fatal(err)
+        }
+    }()
+
 	go func() {
 		srv := http.Server{
 			Addr: "0.0.0.0:8080",
@@ -25,5 +33,4 @@ func main() {
 	signal.Notify(quit, os.Interrupt)
 	signal.Notify(quit, os.Kill)
 	<-quit
-	log.Println("Shutting down...")
 }
