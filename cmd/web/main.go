@@ -2,32 +2,38 @@ package main
 
 import (
 	"fmt"
+	"github.com/jesseops/coppermind/internal/app/services"
+	"github.com/jesseops/coppermind/internal/pkg/routes"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-    "github.com/jesseops/coppermind/internal/app/services"
 )
 
 func main() {
-    container := services.NewContainer()
-    defer func() {
-        if err := container.Shutdown(); err != nil {
-            container.WebServer.Logger.Fatal(err)
-        }
-    }()
+	container := services.NewContainer()
+
+	// Add log if err returned during shutdown
+	defer func() {
+		if err := container.Shutdown(); err != nil {
+			container.WebServer.Logger.Fatal(err)
+		}
+	}()
+
+	// Setup routes
+	routes.SetupRoutes(container)
 
 	go func() {
 		srv := http.Server{
-			Addr: "0.0.0.0:8080",
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				log.Printf("Received request from %s for %s", r.RemoteAddr, r.URL)
-				fmt.Fprintf(w, "Hello, World!")
-			}),
+			Addr: fmt.Sprintf("%s:%d",
+				container.Config.HTTP.Host,
+				container.Config.HTTP.Port),
+			Handler: container.WebServer,
 		}
 		log.Fatal(srv.ListenAndServe())
 	}()
-	log.Println("Server is ready to handle requests at http://localhost:8080")
+	log.Println(fmt.Sprintf("Server is ready to handle requests at http://%s:%d",
+		container.Config.HTTP.Host, container.Config.HTTP.Port))
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)

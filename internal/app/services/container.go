@@ -19,11 +19,11 @@ func NewContainer() *Container {
 }
 
 func (c *Container) initConfig() {
-	var err error
-	c.Config, err = config.LoadConfig()
+    cfg, err := config.LoadConfig()
 	if err != nil {
 		panic(err)
 	}
+    c.Config = &cfg
 }
 
 func (c *Container) initWeb() {

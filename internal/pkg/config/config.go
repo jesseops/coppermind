@@ -25,34 +25,38 @@ type (
 		Database DatabaseConfig
 	}
 
-	HTTPConfig     struct{
-        Host string
-        Port uint16
-    }
+	HTTPConfig struct {
+		Host string
+		Port uint16
+	}
 
-	AppConfig      struct{
-        Env environment
-    }
+	AppConfig struct {
+		Env environment
+	}
 
 	DatabaseConfig struct{}
 )
 
-func LoadConfig() (*Config, error) {
+func LoadConfig() (Config, error) {
+	var config Config
+
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
+    viper.AddConfigPath("config")
+    viper.AddConfigPath("../config")
+    viper.AddConfigPath("../../config")
 
 	viper.SetEnvPrefix("app")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if err := viper.ReadInConfig(); err != nil {
-		return nil, err
+		return config, err
 	}
-	var config Config
 
 	if err := viper.Unmarshal(&config); err != nil {
-		return nil, err
+		return config, err
 	}
-	return &config, nil
+	return config, nil
 }
