@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"github.com/jesseops/coppermind/internal/app/services"
+	"github.com/jesseops/coppermind/internal/pkg/services"
 	"github.com/labstack/echo/v4"
 	"net/http"
 )

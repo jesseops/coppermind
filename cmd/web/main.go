@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/jesseops/coppermind/internal/app/services"
 	"github.com/jesseops/coppermind/internal/pkg/routes"
+	"github.com/jesseops/coppermind/internal/pkg/services"
 	"log"
 	"net/http"
 	"os"
