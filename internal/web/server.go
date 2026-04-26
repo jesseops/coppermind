@@ -186,6 +186,12 @@ func (s *Server) buildRouter() chi.Router {
 		r.Post("/api/v1/me/reading/{id}", s.handleSaveReadingState)
 	})
 
+	// JSON API.
+	s.registerAPIRoutes(r)
+
+	// OPDS catalog.
+	s.registerOPDSRoutes(r)
+
 	// Admin routes.
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAdmin(s.store, s.secret))
