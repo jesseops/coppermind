@@ -43,3 +43,15 @@ fmt:
 # Run tests with race detector
 test-race:
 	$(GO) test -race ./...
+
+# Build Docker image
+docker:
+	docker build -t coppermind:latest .
+
+# Cross-compile releases
+release:
+	@mkdir -p bin/
+	GOOS=linux   GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o bin/coppermind-linux-amd64 ./cmd/coppermind
+	GOOS=linux   GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o bin/coppermind-linux-arm64 ./cmd/coppermind
+	GOOS=darwin  GOARCH=amd64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o bin/coppermind-darwin-amd64 ./cmd/coppermind
+	GOOS=darwin  GOARCH=arm64 $(GO) build $(GOFLAGS) -ldflags "$(LDFLAGS)" -o bin/coppermind-darwin-arm64 ./cmd/coppermind
