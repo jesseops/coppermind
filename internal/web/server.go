@@ -192,6 +192,9 @@ func (s *Server) buildRouter() chi.Router {
 	// OPDS catalog.
 	s.registerOPDSRoutes(r)
 
+	// User routes (shelves, ratings, profile).
+	s.registerUserRoutes(r)
+
 	// Admin routes.
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAdmin(s.store, s.secret))

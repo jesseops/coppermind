@@ -2,7 +2,13 @@
 {{define "title"}}Profile — Coppermind{{end}}
 {{define "content"}}
 <h1>Profile</h1>
-<p><strong>Username:</strong> {{.User.Username}}</p>
-<p><strong>Display Name:</strong> {{.User.DisplayName}}</p>
-<p><strong>Role:</strong> {{.User.Role}}</p>
+<form method="POST" action="/me">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <div class="form-group"><label>Username</label><input type="text" value="{{.User.Username}}" disabled></div>
+    <div class="form-group"><label>Display Name</label><input type="text" name="display_name" value="{{.User.DisplayName}}"></div>
+    <div class="form-group"><label>Kindle Email</label><input type="email" name="kindle_email" value="{{.User.KindleEmail}}" placeholder="your-kindle@kindle.com"></div>
+    <div class="form-group"><label>New Password (leave blank to keep current)</label><input type="password" name="new_password"></div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+<p style="margin-top:1rem;color:var(--color-text-muted);">Role: {{.User.Role}}</p>
 {{end}}
