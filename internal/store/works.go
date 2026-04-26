@@ -231,15 +231,27 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer rows.Close()
 
+	// Collect all works first, then close rows before doing sub-queries.
+	// This avoids deadlock with MaxOpenConns(1).
 	var works []domain.Work
 	for rows.Next() {
 		w, err := scanWorkRow(rows)
 		if err != nil {
+			rows.Close()
 			return nil, 0, err
 		}
-		// Populate denormalized fields.
+		works = append(works, *w)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, 0, err
+	}
+	rows.Close()
+
+	// Now populate denormalized fields with the connection free.
+	for i := range works {
+		w := &works[i]
 		authors, _ := s.GetWorkAuthors(w.ID)
 		w.Authors = authors
 		if w.SeriesID > 0 {
@@ -263,9 +275,8 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 			}
 			edRows.Close()
 		}
-		works = append(works, *w)
 	}
-	return works, total, rows.Err()
+	return works, total, nil
 }
 
 // ── scan helpers ────────────────────────────────────────────────────

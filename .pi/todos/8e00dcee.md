@@ -5,7 +5,7 @@
     "phase-1",
     "foundation"
   ],
-  "status": "open",
+  "status": "done",
   "created_at": "2026-04-26T14:15:38.105Z"
 }
 
