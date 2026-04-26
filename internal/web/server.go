@@ -37,7 +37,7 @@ type Server struct {
 	store    store.Store
 	importer *importer.Importer
 	config   *config.Config
-	tpl      *template.Template
+	pages    map[string]*template.Template // per-page templates (each includes base)
 	secret   []byte
 	router   chi.Router
 }
@@ -51,14 +51,15 @@ func NewServer(s store.Store, cfg *config.Config) (*Server, error) {
 		secret:   cfg.SessionSecretBytes(),
 	}
 
-	// Parse templates.
+	// Parse templates — each page gets its own clone of the base template
+	// so that "title" and "content" block definitions don't collide.
 	funcs := template.FuncMap{
 		"urlquery":  url.QueryEscape,
 		"lower":     strings.ToLower,
 		"title":     strings.Title,
 		"hasPrefix": strings.HasPrefix,
-		"csrfToken": func() string { return "" }, // placeholder, overridden per-request
-		"currentUser": func() any { return nil }, // placeholder
+		"csrfToken": func() string { return "" },
+		"currentUser": func() any { return nil },
 		"formatDate": func(t time.Time) string {
 			if t.IsZero() {
 				return ""
@@ -79,11 +80,38 @@ func NewServer(s store.Store, cfg *config.Config) (*Server, error) {
 		},
 	}
 
-	tpl, err := template.New("").Funcs(funcs).ParseFS(templatesFS, "templates/*.html")
+	// Parse base template first.
+	baseContent, err := fs.ReadFile(templatesFS, "templates/base.html")
 	if err != nil {
-		return nil, fmt.Errorf("parse templates: %w", err)
+		return nil, fmt.Errorf("read base template: %w", err)
 	}
-	srv.tpl = tpl
+	baseTpl, err := template.New("base.html").Funcs(funcs).Parse(string(baseContent))
+	if err != nil {
+		return nil, fmt.Errorf("parse base template: %w", err)
+	}
+
+	// For each page template, clone the base and parse the page into it.
+	pages := make(map[string]*template.Template)
+	entries, err := fs.ReadDir(templatesFS, "templates")
+	if err != nil {
+		return nil, fmt.Errorf("read templates dir: %w", err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == "base.html" {
+			continue
+		}
+		pageContent, err := fs.ReadFile(templatesFS, "templates/"+name)
+		if err != nil {
+			return nil, fmt.Errorf("read template %s: %w", name, err)
+		}
+		pageTpl, err := template.Must(baseTpl.Clone()).Parse(string(pageContent))
+		if err != nil {
+			return nil, fmt.Errorf("parse template %s: %w", name, err)
+		}
+		pages[name] = pageTpl
+	}
+	srv.pages = pages
 
 	// Build router.
 	srv.router = srv.buildRouter()
@@ -240,8 +268,15 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	data["CurrentUser"] = auth.UserFromContext(r.Context())
 	data["Config"] = s.config
 
+	tpl, ok := s.pages[name]
+	if !ok {
+		slog.Error("template not found", "name", name)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tpl.ExecuteTemplate(w, name, data); err != nil {
+	if err := tpl.ExecuteTemplate(w, "base", data); err != nil {
 		slog.Error("render template", "name", name, "err", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
@@ -254,8 +289,15 @@ func (s *Server) renderPartial(w http.ResponseWriter, r *http.Request, name stri
 	data["CSRFToken"] = auth.CSRFToken(r)
 	data["CurrentUser"] = auth.UserFromContext(r.Context())
 
+	// For partials, look for the named block in home.html (which defines works_grid).
+	tpl, ok := s.pages["home.html"]
+	if !ok {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	s.tpl.ExecuteTemplate(w, name, data)
+	tpl.ExecuteTemplate(w, name, data)
 }
 
 // ── Middleware ───────────────────────────────────────────────────────

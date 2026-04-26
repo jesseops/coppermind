@@ -1,4 +1,3 @@
-{{template "base" .}}
 {{define "title"}}{{.Shelf.Name}} — Coppermind{{end}}
 {{define "content"}}
 <h1>{{.Shelf.Name}} {{if not .Shelf.IsPublic}}🔒{{end}}</h1>
