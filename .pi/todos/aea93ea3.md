@@ -5,9 +5,8 @@
     "phase-1",
     "import"
   ],
-  "status": "open",
-  "created_at": "2026-04-26T14:16:12.308Z",
-  "assigned_to_session": "019dca13-bab2-757b-8af3-670d85b8173b"
+  "status": "done",
+  "created_at": "2026-04-26T14:16:12.308Z"
 }
 
 ## Goal
