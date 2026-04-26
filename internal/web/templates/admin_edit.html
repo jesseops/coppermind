@@ -1,0 +1,16 @@
+{{template "base" .}}
+{{define "title"}}Edit: {{.Work.Title}} — Coppermind{{end}}
+{{define "content"}}
+<h1>Edit: {{.Work.Title}}</h1>
+<form method="POST" action="/admin/works/{{.Work.ID}}">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <div class="form-group"><label>Title</label><input type="text" name="title" value="{{.Work.Title}}"></div>
+    <div class="form-group"><label>Description</label><textarea name="description" rows="4">{{.Work.Description}}</textarea></div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="/works/{{.Work.ID}}" class="btn btn-sm" style="margin-left:0.5rem;">Cancel</a>
+</form>
+<form method="POST" action="/admin/works/{{.Work.ID}}/delete" style="margin-top:2rem;border-top:1px solid var(--color-border);padding-top:1rem;">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <button type="submit" class="btn btn-sm" style="background:#ef4444;color:white;" onclick="return confirm('Delete this work?')">Delete Work</button>
+</form>
+{{end}}

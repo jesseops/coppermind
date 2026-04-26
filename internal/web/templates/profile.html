@@ -1,0 +1,8 @@
+{{template "base" .}}
+{{define "title"}}Profile — Coppermind{{end}}
+{{define "content"}}
+<h1>Profile</h1>
+<p><strong>Username:</strong> {{.User.Username}}</p>
+<p><strong>Display Name:</strong> {{.User.DisplayName}}</p>
+<p><strong>Role:</strong> {{.User.Role}}</p>
+{{end}}

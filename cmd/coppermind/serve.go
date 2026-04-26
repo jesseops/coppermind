@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 
+	"github.com/jesseops/coppermind/internal/store"
+	"github.com/jesseops/coppermind/internal/web"
 	"github.com/spf13/cobra"
 )
 
@@ -15,22 +17,30 @@ func newServeCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "Start the web server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, err := loadConfig()
+			c, err := loadConfig()
 			if err != nil {
 				return err
 			}
 			if host != "" {
-				cfg.Host = host
+				c.Host = host
 			}
 			if port > 0 {
-				cfg.Port = port
+				c.Port = port
+			}
+			cfg = c
+
+			s, err := store.NewSQLiteStore(c.DBPath)
+			if err != nil {
+				return fmt.Errorf("open database: %w", err)
+			}
+			defer s.Close()
+
+			srv, err := web.NewServer(s, c)
+			if err != nil {
+				return fmt.Errorf("create server: %w", err)
 			}
 
-			// The actual web server will be implemented in task 18.
-			// For now, just print the config.
-			fmt.Fprintf(cmd.OutOrStdout(), "Starting server on %s (db: %s)\n", cfg.Addr(), cfg.DBPath)
-			fmt.Fprintln(cmd.OutOrStdout(), "Web server not yet implemented — see task 18")
-			return nil
+			return srv.Run()
 		},
 	}
 	cmd.Flags().StringVar(&host, "host", "", "Bind host")

@@ -5,9 +5,6 @@ bin/
 data/
 *.db
 
-# Generated CSS
-internal/web/static/css/app.css
-
 # OS
 .DS_Store
 Thumbs.db
