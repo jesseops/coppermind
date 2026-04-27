@@ -85,6 +85,19 @@ func (s *Server) handleCover(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// Validate the file is actually an image before serving.
+	f, err := os.Open(safe)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	header := make([]byte, 12)
+	n, _ := f.Read(header)
+	f.Close()
+	if n < 4 || !isImageHeader(header[:n]) {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	http.ServeFile(w, r, safe)
 }
@@ -813,6 +826,27 @@ func rewriteAttrValues(html, prefix string, fn func(string) string) string {
 		i = valStart + valEnd + 1
 	}
 	return b.String()
+}
+
+// isImageHeader checks magic bytes to verify data starts with a known image format.
+func isImageHeader(data []byte) bool {
+	if len(data) < 4 {
+		return false
+	}
+	if data[0] == 0xFF && data[1] == 0xD8 {
+		return true // JPEG
+	}
+	if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
+		return true // PNG
+	}
+	if data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 {
+		return true // GIF
+	}
+	if len(data) >= 12 && data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46 &&
+		data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50 {
+		return true // WebP
+	}
+	return false
 }
 
 // rewriteLinkHrefs rewrites href attributes only on <link> elements (for CSS).

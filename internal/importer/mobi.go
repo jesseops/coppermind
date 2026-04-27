@@ -65,15 +65,22 @@ func ExtractMobiMetadata(filePath string) (*Extracted, error) {
 	ext.ISBN = extractISBNFromMobi(records)
 
 	// Extract cover.
+	// EXTH 201/202 stores the cover image offset relative to the first image record.
+	// The first image record index is at byte 108 of the MOBI header in record 0.
 	raw, err := parseEXTHRaw(record0)
 	if err == nil {
-		recordIndex := mobiCoverRecordIndex(raw)
-		if recordIndex >= 0 {
+		firstImageRecord := mobiFirstImageRecord(record0)
+		coverOffset := mobiCoverOffset(raw)
+		if firstImageRecord >= 0 && coverOffset >= 0 {
+			recordIndex := firstImageRecord + coverOffset
 			start, end, err := mobiRecordOffset(data, recordIndex)
 			if err == nil && start < end && int(end) <= len(data) {
 				cover := data[start:end]
-				ext.CoverData = cover
-				ext.CoverExt = detectImageExt(cover)
+				// Validate it's actually an image (not HTML or other data).
+				if isImageData(cover) {
+					ext.CoverData = cover
+					ext.CoverExt = detectImageExt(cover)
+				}
 			}
 		}
 	}
@@ -312,7 +319,7 @@ func looksLikePersonName(s string) bool {
 	return true
 }
 
-func mobiCoverRecordIndex(records map[uint32][][]byte) int {
+func mobiCoverOffset(records map[uint32][][]byte) int {
 	for _, key := range []uint32{201, 202} {
 		raws, ok := records[key]
 		if !ok || len(raws) == 0 {
@@ -322,12 +329,55 @@ func mobiCoverRecordIndex(records map[uint32][][]byte) int {
 		if len(raw) < 4 {
 			continue
 		}
-		index := int(binary.BigEndian.Uint32(raw[:4]))
-		if index > 0 {
-			return index
+		offset := int(binary.BigEndian.Uint32(raw[:4]))
+		if offset >= 0 {
+			return offset
 		}
 	}
 	return -1
+}
+
+// mobiFirstImageRecord reads the "first image record" index from the MOBI
+// header at byte offset 108 within record 0.
+func mobiFirstImageRecord(record0 []byte) int {
+	// MOBI header starts at offset 16 in record 0 (after PalmDOC header).
+	// The "first image index" field is at MOBI header offset 108,
+	// which is record0 offset 16 + 108 = 124... but this varies.
+	// A more reliable approach: it's at absolute offset 108 in record 0
+	// for MOBI headers that are long enough.
+	if len(record0) < 112 {
+		return -1
+	}
+	return int(binary.BigEndian.Uint32(record0[108:112]))
+}
+
+// isImageData checks the magic bytes to verify data is an actual image.
+func isImageData(data []byte) bool {
+	if len(data) < 4 {
+		return false
+	}
+	// JPEG
+	if data[0] == 0xFF && data[1] == 0xD8 {
+		return true
+	}
+	// PNG
+	if data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47 {
+		return true
+	}
+	// GIF
+	if data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 {
+		return true
+	}
+	// BMP
+	if data[0] == 0x42 && data[1] == 0x4D {
+		return true
+	}
+	// WebP (RIFF....WEBP)
+	if len(data) >= 12 && data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46 &&
+		data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50 {
+		return true
+	}
+	return false
 }
 
 func decompressPalmDoc(data []byte) []byte {
