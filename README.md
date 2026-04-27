@@ -1,6 +1,6 @@
 # Coppermind
 
-**Your personal Plex, but for books.**
+**Your personal digital library for ebooks and audiobooks.**
 
 Coppermind is a self-hosted digital library for ebooks and audiobooks. Run it on your home server, NAS, or a cheap VPS. Your family browses, reads, and listens from any device.
 

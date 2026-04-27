@@ -20,7 +20,7 @@ it on your home server, NAS, or a cheap VPS. Your family browses, reads, and
 listens from any device. You manage the collection. Power users can send books
 directly to their e-readers.
 
-**One-line pitch:** "Your personal Plex, but for books."
+**One-line pitch:** "Your personal digital library for ebooks and audiobooks."
 
 ### Core Use Cases
 

@@ -23,7 +23,7 @@ func Execute() error {
 func newRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "coppermind",
-		Short: "Your personal Plex, but for books",
+		Short: "Your personal digital library for ebooks and audiobooks",
 		Long:  "Coppermind is a self-hosted digital library for ebooks and audiobooks.",
 		SilenceUsage: true,
 	}

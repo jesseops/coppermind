@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-Coppermind is a self-hosted ebook/audiobook library server ("Plex for books").
+Coppermind is a self-hosted ebook/audiobook library server.
 It's a greenfield Go rewrite of an earlier ~9k-line codebase at `~/code/coppermind-codex`.
 The design spec is in `DESIGN_V2.md` — read it for product vision and data model rationale.
 
