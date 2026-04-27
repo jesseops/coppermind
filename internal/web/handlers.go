@@ -74,10 +74,19 @@ func (s *Server) handleWorkDetail(w http.ResponseWriter, r *http.Request) {
 	editions, _ := s.store.ListEditions(id)
 	tags, _ := s.store.ListTags(id)
 
+	// Collect editions that have their own cover (for admin cover picker).
+	var editionsWithCovers []domain.Edition
+	for _, ed := range editions {
+		if ed.HasCover() {
+			editionsWithCovers = append(editionsWithCovers, ed)
+		}
+	}
+
 	s.render(w, r, "work.html", templateData{
-		"Work":     work,
-		"Editions": editions,
-		"Tags":     tags,
+		"Work":               work,
+		"Editions":           editions,
+		"Tags":               tags,
+		"EditionsWithCovers": editionsWithCovers,
 	})
 }
 
@@ -146,6 +155,17 @@ func (s *Server) handleCover(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	http.ServeFile(w, r, work.CoverPath)
+}
+
+func (s *Server) handleEditionCover(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	edition, err := s.store.GetEdition(id)
+	if err != nil || edition.CoverPath == "" {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	http.ServeFile(w, r, edition.CoverPath)
 }
 
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {

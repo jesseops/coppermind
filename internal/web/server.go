@@ -68,6 +68,31 @@ func NewServer(s store.Store, cfg *config.Config) (*Server, error) {
 			}
 			return t.Format("Jan 2, 2006")
 		},
+		"formatBytes": func(b int64) string {
+			const (
+				KB = 1024
+				MB = KB * 1024
+				GB = MB * 1024
+			)
+			switch {
+			case b >= GB:
+				return fmt.Sprintf("%.1f GB", float64(b)/float64(GB))
+			case b >= MB:
+				return fmt.Sprintf("%.1f MB", float64(b)/float64(MB))
+			case b >= KB:
+				return fmt.Sprintf("%.0f KB", float64(b)/float64(KB))
+			default:
+				return fmt.Sprintf("%d B", b)
+			}
+		},
+		"formatDuration": func(seconds int) string {
+			h := seconds / 3600
+			m := (seconds % 3600) / 60
+			if h > 0 {
+				return fmt.Sprintf("%dh %dm", h, m)
+			}
+			return fmt.Sprintf("%dm", m)
+		},
 		"coverInitials": coverInitials,
 		"subtract": func(a, b int) int { return a - b },
 		"add":      func(a, b int) int { return a + b },
@@ -203,6 +228,7 @@ func (s *Server) buildRouter() chi.Router {
 		r.Get("/series", s.handleSeriesList)
 		r.Get("/series/{id}", s.handleSeriesDetail)
 		r.Get("/covers/{id}", s.handleCover)
+		r.Get("/covers/edition/{id}", s.handleEditionCover)
 		r.Get("/download/{id}", s.handleDownload)
 		r.Get("/receive", s.handleReceivePage)
 
@@ -241,6 +267,9 @@ func (s *Server) buildRouter() chi.Router {
 			r.Get("/admin/works/{id}/edit", s.handleAdminEditForm)
 			r.Post("/admin/works/{id}", s.handleAdminEditSubmit)
 			r.Post("/admin/works/{id}/delete", s.handleAdminDeleteWork)
+			r.Post("/admin/editions/{id}", s.handleAdminUpdateEdition)
+			r.Get("/admin/works/{id}/covers/search", s.handleAdminCoverSearch)
+			r.Post("/admin/works/{id}/covers/apply", s.handleAdminCoverApply)
 			r.Get("/admin/users", s.handleAdminUsers)
 			r.Post("/admin/users", s.handleAdminCreateUser)
 			r.Get("/admin/duplicates", s.handleAdminDuplicates)
