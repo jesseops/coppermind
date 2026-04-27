@@ -5,10 +5,55 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jesseops/coppermind/internal/domain"
 )
+
+type editionRow struct {
+	ID              int64          `db:"id"`
+	WorkID          int64          `db:"work_id"`
+	EditionType     string         `db:"edition_type"`
+	Format          sql.NullString `db:"format"`
+	ISBN            sql.NullString `db:"isbn"`
+	Publisher       sql.NullString `db:"publisher"`
+	PublishedYear   sql.NullInt64  `db:"published_year"`
+	Narrator        sql.NullString `db:"narrator"`
+	DurationSeconds sql.NullInt64  `db:"duration_seconds"`
+	FilePath        sql.NullString `db:"file_path"`
+	FileHash        sql.NullString `db:"file_hash"`
+	FileSize        sql.NullInt64  `db:"file_size"`
+	CoverPath       sql.NullString `db:"cover_path"`
+	Notes           sql.NullString `db:"notes"`
+	Status          string         `db:"status"`
+	CreatedAt       string         `db:"created_at"`
+	UpdatedAt       string         `db:"updated_at"`
+}
+
+func (r editionRow) toDomain() domain.Edition {
+	return domain.Edition{
+		ID:              r.ID,
+		WorkID:          r.WorkID,
+		EditionType:     r.EditionType,
+		Format:          r.Format.String,
+		ISBN:            r.ISBN.String,
+		Publisher:       r.Publisher.String,
+		PublishedYear:   int(r.PublishedYear.Int64),
+		Narrator:        r.Narrator.String,
+		DurationSeconds: int(r.DurationSeconds.Int64),
+		FilePath:        r.FilePath.String,
+		FileHash:        r.FileHash.String,
+		FileSize:        r.FileSize.Int64,
+		CoverPath:       r.CoverPath.String,
+		Notes:           r.Notes.String,
+		Status:          r.Status,
+		CreatedAt:       parseDBTime(r.CreatedAt),
+		UpdatedAt:       parseDBTime(r.UpdatedAt),
+	}
+}
+
+const editionColumns = `id, work_id, edition_type, format, isbn, publisher, published_year,
+	narrator, duration_seconds, file_path, file_hash, file_size,
+	cover_path, notes, status, created_at, updated_at`
 
 func (s *SQLiteStore) CreateEdition(e *domain.Edition) error {
 	if e.Status == "" {
@@ -34,34 +79,22 @@ func (s *SQLiteStore) CreateEdition(e *domain.Edition) error {
 }
 
 func (s *SQLiteStore) GetEdition(id int64) (*domain.Edition, error) {
-	return s.scanEdition(
-		`SELECT id, work_id, edition_type, format, isbn, publisher, published_year,
-		        narrator, duration_seconds, file_path, file_hash, file_size,
-		        cover_path, notes, status, created_at, updated_at
-		 FROM editions WHERE id = ?`, id)
+	return s.scanEdition("SELECT "+editionColumns+" FROM editions WHERE id = ?", id)
 }
 
 func (s *SQLiteStore) ListEditions(workID int64) ([]domain.Edition, error) {
-	rows, err := s.db.Query(`
-		SELECT id, work_id, edition_type, format, isbn, publisher, published_year,
-		       narrator, duration_seconds, file_path, file_hash, file_size,
-		       cover_path, notes, status, created_at, updated_at
+	var rows []editionRow
+	if err := s.db.Select(&rows, `SELECT `+editionColumns+`
 		FROM editions WHERE work_id = ? AND status = 'active'
-		ORDER BY edition_type, format`, workID)
-	if err != nil {
+		ORDER BY edition_type, format`, workID); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var editions []domain.Edition
-	for rows.Next() {
-		e, err := scanEditionRow(rows)
-		if err != nil {
-			return nil, err
-		}
-		editions = append(editions, *e)
+	editions := make([]domain.Edition, 0, len(rows))
+	for _, row := range rows {
+		editions = append(editions, row.toDomain())
 	}
-	return editions, rows.Err()
+	return editions, nil
 }
 
 func (s *SQLiteStore) UpdateEdition(id int64, updates EditionUpdate) error {
@@ -143,11 +176,7 @@ func (s *SQLiteStore) FindEditionByHash(hash string) (*domain.Edition, error) {
 	if hash == "" {
 		return nil, nil
 	}
-	e, err := s.scanEdition(
-		`SELECT id, work_id, edition_type, format, isbn, publisher, published_year,
-		        narrator, duration_seconds, file_path, file_hash, file_size,
-		        cover_path, notes, status, created_at, updated_at
-		 FROM editions WHERE file_hash = ? AND status = 'active' LIMIT 1`, hash)
+	e, err := s.scanEdition("SELECT "+editionColumns+" FROM editions WHERE file_hash = ? AND status = 'active' LIMIT 1", hash)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, nil
@@ -160,71 +189,13 @@ func (s *SQLiteStore) FindEditionByHash(hash string) (*domain.Edition, error) {
 // ── scan helpers ────────────────────────────────────────────────────
 
 func (s *SQLiteStore) scanEdition(query string, args ...any) (*domain.Edition, error) {
-	var e domain.Edition
-	var format, isbn, publisher, narrator, filePath, fileHash, coverPath, notes sql.NullString
-	var pubYear, duration sql.NullInt64
-	var fileSize sql.NullInt64
-	var createdAt, updatedAt string
-
-	err := s.db.QueryRow(query, args...).Scan(
-		&e.ID, &e.WorkID, &e.EditionType,
-		&format, &isbn, &publisher, &pubYear,
-		&narrator, &duration, &filePath, &fileHash, &fileSize,
-		&coverPath, &notes, &e.Status,
-		&createdAt, &updatedAt,
-	)
-	if err != nil {
+	var row editionRow
+	if err := s.db.Get(&row, query, args...); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, notFound("edition", "")
 		}
 		return nil, err
 	}
-
-	e.Format = format.String
-	e.ISBN = isbn.String
-	e.Publisher = publisher.String
-	e.PublishedYear = int(pubYear.Int64)
-	e.Narrator = narrator.String
-	e.DurationSeconds = int(duration.Int64)
-	e.FilePath = filePath.String
-	e.FileHash = fileHash.String
-	e.FileSize = fileSize.Int64
-	e.CoverPath = coverPath.String
-	e.Notes = notes.String
-	e.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	e.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
-	return &e, nil
-}
-
-func scanEditionRow(rows *sql.Rows) (*domain.Edition, error) {
-	var e domain.Edition
-	var format, isbn, publisher, narrator, filePath, fileHash, coverPath, notes sql.NullString
-	var pubYear, duration, fileSize sql.NullInt64
-	var createdAt, updatedAt string
-
-	err := rows.Scan(
-		&e.ID, &e.WorkID, &e.EditionType,
-		&format, &isbn, &publisher, &pubYear,
-		&narrator, &duration, &filePath, &fileHash, &fileSize,
-		&coverPath, &notes, &e.Status,
-		&createdAt, &updatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	e.Format = format.String
-	e.ISBN = isbn.String
-	e.Publisher = publisher.String
-	e.PublishedYear = int(pubYear.Int64)
-	e.Narrator = narrator.String
-	e.DurationSeconds = int(duration.Int64)
-	e.FilePath = filePath.String
-	e.FileHash = fileHash.String
-	e.FileSize = fileSize.Int64
-	e.CoverPath = coverPath.String
-	e.Notes = notes.String
-	e.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	e.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+	e := row.toDomain()
 	return &e, nil
 }

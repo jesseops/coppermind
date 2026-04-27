@@ -9,6 +9,32 @@ import (
 	"github.com/jesseops/coppermind/internal/domain"
 )
 
+type userRow struct {
+	ID           int64  `db:"id"`
+	Username     string `db:"username"`
+	DisplayName  string `db:"display_name"`
+	PasswordHash string `db:"password_hash"`
+	Role         string `db:"role"`
+	KindleEmail  string `db:"kindle_email"`
+	CreatedAt    string `db:"created_at"`
+	UpdatedAt    string `db:"updated_at"`
+}
+
+func (r userRow) toDomain() domain.User {
+	return domain.User{
+		ID:           r.ID,
+		Username:     r.Username,
+		DisplayName:  r.DisplayName,
+		PasswordHash: r.PasswordHash,
+		Role:         r.Role,
+		KindleEmail:  r.KindleEmail,
+		CreatedAt:    parseDBTime(r.CreatedAt),
+		UpdatedAt:    parseDBTime(r.UpdatedAt),
+	}
+}
+
+const userColumns = `id, username, display_name, password_hash, role, kindle_email, created_at, updated_at`
+
 func (s *SQLiteStore) CreateUser(username, displayName, passwordHash, role string) (*domain.User, error) {
 	res, err := s.db.Exec(
 		`INSERT INTO users (username, display_name, password_hash, role) VALUES (?, ?, ?, ?)`,
@@ -22,29 +48,24 @@ func (s *SQLiteStore) CreateUser(username, displayName, passwordHash, role strin
 }
 
 func (s *SQLiteStore) GetUser(id int64) (*domain.User, error) {
-	return s.scanUser("SELECT id, username, display_name, password_hash, role, kindle_email, created_at, updated_at FROM users WHERE id = ?", id)
+	return s.scanUser("SELECT "+userColumns+" FROM users WHERE id = ?", id)
 }
 
 func (s *SQLiteStore) GetUserByUsername(username string) (*domain.User, error) {
-	return s.scanUser("SELECT id, username, display_name, password_hash, role, kindle_email, created_at, updated_at FROM users WHERE username = ?", username)
+	return s.scanUser("SELECT "+userColumns+" FROM users WHERE username = ?", username)
 }
 
 func (s *SQLiteStore) ListUsers() ([]domain.User, error) {
-	rows, err := s.db.Query("SELECT id, username, display_name, password_hash, role, kindle_email, created_at, updated_at FROM users ORDER BY username")
-	if err != nil {
+	var rows []userRow
+	if err := s.db.Select(&rows, "SELECT "+userColumns+" FROM users ORDER BY username"); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var users []domain.User
-	for rows.Next() {
-		u, err := scanUserRow(rows)
-		if err != nil {
-			return nil, err
-		}
-		users = append(users, *u)
+	users := make([]domain.User, 0, len(rows))
+	for _, row := range rows {
+		users = append(users, row.toDomain())
 	}
-	return users, rows.Err()
+	return users, nil
 }
 
 func (s *SQLiteStore) UpdateUser(id int64, updates UserUpdate) error {
@@ -99,38 +120,13 @@ func (s *SQLiteStore) CountUsers() (int, error) {
 // ── scan helpers ────────────────────────────────────────────────────
 
 func (s *SQLiteStore) scanUser(query string, args ...any) (*domain.User, error) {
-	var u domain.User
-	var createdAt, updatedAt string
-	err := s.db.QueryRow(query, args...).Scan(
-		&u.ID, &u.Username, &u.DisplayName, &u.PasswordHash, &u.Role, &u.KindleEmail,
-		&createdAt, &updatedAt,
-	)
-	if err != nil {
+	var row userRow
+	if err := s.db.Get(&row, query, args...); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, notFound("user", "")
 		}
 		return nil, err
 	}
-	u.CreatedAt = parseDBTime(createdAt)
-	u.UpdatedAt = parseDBTime(updatedAt)
-	return &u, nil
-}
-
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
-func scanUserRow(row rowScanner) (*domain.User, error) {
-	var u domain.User
-	var createdAt, updatedAt string
-	err := row.Scan(
-		&u.ID, &u.Username, &u.DisplayName, &u.PasswordHash, &u.Role, &u.KindleEmail,
-		&createdAt, &updatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-	u.CreatedAt = parseDBTime(createdAt)
-	u.UpdatedAt = parseDBTime(updatedAt)
+	u := row.toDomain()
 	return &u, nil
 }
