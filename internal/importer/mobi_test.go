@@ -62,6 +62,27 @@ func TestFixMobiAuthorTitleSwap(t *testing.T) {
 			wantTitle:  "The Great Gatsby",
 			wantAuthor: "F Scott Fitzgerald",
 		},
+		{
+			name:       "numeric title with title in author field",
+			title:      "115",
+			author:     "Sabotage at Sports city",
+			wantTitle:  "Sabotage at Sports city",
+			wantAuthor: "",
+		},
+		{
+			name:       "short code title with title in author field",
+			title:      "IV",
+			author:     "The Broken Earth",
+			wantTitle:  "The Broken Earth",
+			wantAuthor: "",
+		},
+		{
+			name:       "author has prepositions - looks like title",
+			title:      "Murder on the Orient Express",
+			author:     "Agatha Christie",
+			wantTitle:  "Murder on the Orient Express",
+			wantAuthor: "Agatha Christie",
+		},
 	}
 
 	for _, tt := range tests {
@@ -84,17 +105,41 @@ func TestLooksLikePersonName(t *testing.T) {
 		{"Frank Herbert", true},
 		{"Isaac Asimov", true},
 		{"F Scott Fitzgerald", true},
-		{"A Bathroom of Her Own", false},
-		{"The Great Gatsby", false},
-		{"An Introduction to Go", false},
-		{"Dune", false},
-		{"", false},
+		{"Christie, Agatha", true},           // Last, First format
+		{"A Bathroom of Her Own", false},      // starts with "A"
+		{"The Great Gatsby", false},           // starts with "The"
+		{"An Introduction to Go", false},      // starts with "An"
+		{"Sabotage at Sports city", false},    // contains "at"
+		{"Murder on the Orient Express", false}, // contains "on", "the"
+		{"Dune", false},                       // single word
+		{"", false},                           // empty
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			if got := looksLikePersonName(tt.input); got != tt.want {
 				t.Errorf("looksLikePersonName(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLooksLikeSeriesNumber(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"115", true},
+		{"3", true},
+		{"IV", true},
+		{"", false},
+		{"Dune", false},
+		{"The Great Gatsby", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := looksLikeSeriesNumber(tt.input); got != tt.want {
+				t.Errorf("looksLikeSeriesNumber(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}

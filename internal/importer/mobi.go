@@ -305,49 +305,112 @@ func fixMobiAuthorTitleSwap(title, author string) (string, string) {
 	}
 
 	// Case 1: Title contains "Author - Title" pattern.
-	// The author field often holds the actual title in this case.
 	if parts := strings.SplitN(title, " - ", 2); len(parts) == 2 {
 		candidateAuthor := strings.TrimSpace(parts[0])
 		candidateTitle := strings.TrimSpace(parts[1])
 
 		if candidateAuthor != "" && candidateTitle != "" {
-			// If the EXTH 100 "author" looks like it's actually the title
-			// (matches the title portion of the combined string, or the
-			// combined string's author portion looks like a person name),
 			if looksLikePersonName(candidateAuthor) && !looksLikePersonName(author) {
 				return candidateTitle, candidateAuthor
 			}
 		}
 	}
 
-	// Case 2: Author and title appear simply swapped.
-	// If the "title" looks like a person name and the "author" doesn't.
+	// Case 2: Title is numeric/very short and author looks like a title.
+	// Common in old Calibre where EXTH 503 gets a series number and EXTH 100 gets the title.
+	if looksLikeSeriesNumber(title) && author != "" && !looksLikeSeriesNumber(author) {
+		// The "title" is just a number — the author is probably the actual title.
+		// We can't recover the author, so use the author field as title and clear author.
+		return author, ""
+	}
+
+	// Case 3: Author and title appear simply swapped.
 	if looksLikePersonName(title) && !looksLikePersonName(author) && author != "" {
 		return author, title
+	}
+
+	// Case 4: Author field contains common title words (prepositions etc.)
+	// but the title field doesn't look like a person name either.
+	if author != "" && looksLikeBookTitle(author) && !looksLikeBookTitle(title) && !looksLikePersonName(author) {
+		return author, ""
 	}
 
 	return title, author
 }
 
-// looksLikePersonName returns true if the string looks like a person's name
-// (2-4 words, no very long words, no common title articles as first word).
+// looksLikeSeriesNumber returns true if the string is purely numeric,
+// a Roman numeral, or a very short non-name string (e.g., "115", "IV", "Book 3").
+func looksLikeSeriesNumber(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	// Purely numeric.
+	allDigits := true
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			allDigits = false
+			break
+		}
+	}
+	if allDigits {
+		return true
+	}
+	// Very short (1-3 chars) — likely a code/number, not a title.
+	if len(s) <= 3 {
+		return true
+	}
+	return false
+}
+
+// looksLikePersonName returns true if the string looks like a person's name.
 func looksLikePersonName(s string) bool {
 	words := strings.Fields(s)
 	if len(words) < 2 || len(words) > 5 {
 		return false
 	}
-	// Titles commonly start with articles; names don't.
+	// "Last, First" format is definitively a name.
+	if strings.Contains(s, ",") {
+		return true
+	}
+	// Names don't start with articles.
 	first := strings.ToLower(words[0])
 	if first == "a" || first == "an" || first == "the" {
 		return false
 	}
-	// Each word in a name is typically short and capitalized.
+	// Names don't contain common English prepositions/conjunctions.
 	for _, w := range words {
+		lower := strings.ToLower(w)
+		if isTitleWord(lower) {
+			return false
+		}
 		if len(w) > 20 {
 			return false
 		}
 	}
 	return true
+}
+
+// looksLikeBookTitle returns true if the string contains words commonly
+// found in book titles but not in person names.
+func looksLikeBookTitle(s string) bool {
+	for _, w := range strings.Fields(s) {
+		if isTitleWord(strings.ToLower(w)) {
+			return true
+		}
+	}
+	return false
+}
+
+// isTitleWord returns true for common English words found in titles but not names.
+func isTitleWord(lower string) bool {
+	switch lower {
+	case "at", "in", "of", "the", "and", "or", "to", "for", "from",
+		"with", "on", "by", "into", "through", "over", "under",
+		"between", "about", "against", "during", "before", "after":
+		return true
+	}
+	return false
 }
 
 func mobiCoverOffset(records map[uint32][][]byte) int {
