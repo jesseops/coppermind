@@ -475,26 +475,3 @@ func scanWorkRow(rows *sql.Rows) (*domain.Work, error) {
 	w.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
 	return &w, nil
 }
-
-// ── null helpers ────────────────────────────────────────────────────
-
-func nullOrZeroInt64(v int64) any {
-	if v == 0 {
-		return nil
-	}
-	return v
-}
-
-func nullOrZeroFloat(v float64) any {
-	if v == 0 {
-		return nil
-	}
-	return v
-}
-
-func nullOrZeroInt(v int) any {
-	if v == 0 {
-		return nil
-	}
-	return v
-}

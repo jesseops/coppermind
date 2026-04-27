@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jesseops/coppermind/internal/domain"
 )
@@ -80,11 +79,7 @@ func (s *SQLiteStore) UpdateUser(id int64, updates UserUpdate) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("user %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "user", id)
 }
 
 func (s *SQLiteStore) DeleteUser(id int64) error {
@@ -92,11 +87,7 @@ func (s *SQLiteStore) DeleteUser(id int64) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("user %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "user", id)
 }
 
 func (s *SQLiteStore) CountUsers() (int, error) {
@@ -116,12 +107,12 @@ func (s *SQLiteStore) scanUser(query string, args ...any) (*domain.User, error) 
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("user not found")
+			return nil, notFound("user", "")
 		}
 		return nil, err
 	}
-	u.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	u.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+	u.CreatedAt = parseDBTime(createdAt)
+	u.UpdatedAt = parseDBTime(updatedAt)
 	return &u, nil
 }
 
@@ -139,7 +130,7 @@ func scanUserRow(row rowScanner) (*domain.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	u.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	u.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+	u.CreatedAt = parseDBTime(createdAt)
+	u.UpdatedAt = parseDBTime(updatedAt)
 	return &u, nil
 }

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jesseops/coppermind/internal/domain"
@@ -79,12 +78,4 @@ func (s *SQLiteStore) ListSeries(libraryID int64) ([]SeriesWithCount, error) {
 		result = append(result, sc)
 	}
 	return result, rows.Err()
-}
-
-// nullOrEmpty returns nil for empty strings, the string otherwise.
-func nullOrEmpty(s string) any {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	return s
 }
