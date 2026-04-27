@@ -195,9 +195,17 @@ func (s *Server) downloadCover(coverURL string, workID int64) (string, error) {
 	}
 	defer f.Close()
 
-	if _, err := io.Copy(f, resp.Body); err != nil {
+	n, err := io.Copy(f, resp.Body)
+	if err != nil {
 		return "", err
 	}
+
+	// Open Library returns a tiny 1x1 placeholder for missing covers.
+	if n < 1000 {
+		os.Remove(path)
+		return "", fmt.Errorf("downloaded image too small (%d bytes) — likely a placeholder", n)
+	}
+
 	return path, nil
 }
 
@@ -359,7 +367,8 @@ func (s *Server) handleAdminCoverApply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `<span style="color:var(--color-success);">✓ Cover updated — <a href="/works/%d">refresh to see</a></span>`, id)
+	w.Header().Set("HX-Trigger", "coverUpdated")
+	fmt.Fprintf(w, `<span class="text-success">✓ Cover updated</span>`)
 }
 
 // File helpers — thin wrappers to enable testing.

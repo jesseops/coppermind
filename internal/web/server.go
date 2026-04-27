@@ -285,6 +285,8 @@ func (s *Server) buildRouter() chi.Router {
 			r.Post("/admin/editions/{id}", s.handleAdminUpdateEdition)
 			r.Get("/admin/works/{id}/covers/search", s.handleAdminCoverSearch)
 			r.Post("/admin/works/{id}/covers/apply", s.handleAdminCoverApply)
+			r.Get("/admin/works/{id}/metadata/search", s.handleAdminMetadataSearch)
+			r.Post("/admin/works/{id}/metadata/apply", s.handleAdminMetadataApply)
 			r.Get("/admin/users", s.handleAdminUsers)
 			r.Post("/admin/users", s.handleAdminCreateUser)
 			r.Get("/admin/duplicates", s.handleAdminDuplicates)

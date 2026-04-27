@@ -24,18 +24,21 @@ func (s *Server) safePath(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("empty path")
 	}
-	cleaned := filepath.Clean(path)
-	dataDir := filepath.Clean(s.config.DataDir)
 
-	// Handle both absolute and relative paths.
-	if !filepath.IsAbs(cleaned) {
-		cleaned = filepath.Join(dataDir, cleaned)
+	// Resolve both to absolute paths for reliable comparison.
+	absData, err := filepath.Abs(s.config.DataDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve data dir: %w", err)
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("resolve path: %w", err)
 	}
 
-	if !strings.HasPrefix(cleaned, dataDir+string(filepath.Separator)) && cleaned != dataDir {
+	if !strings.HasPrefix(absPath, absData+string(filepath.Separator)) && absPath != absData {
 		return "", fmt.Errorf("path %q is outside data directory", path)
 	}
-	return cleaned, nil
+	return absPath, nil
 }
 
 // ── Public handlers ─────────────────────────────────────────────────

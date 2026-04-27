@@ -3,18 +3,13 @@
 <div class="flex gap-8 mt-4 flex-wrap md:flex-nowrap">
     {{/* Cover */}}
     <div class="shrink-0 w-[200px]">
-        <div class="cover w-[200px] aspect-[2/3] rounded-lg overflow-hidden bg-surface flex items-center justify-center text-5xl text-text-muted">
+        <div id="work-cover" class="cover w-[200px] aspect-[2/3] rounded-lg overflow-hidden bg-surface flex items-center justify-center text-5xl text-text-muted">
             {{if .Work.HasCover}}
-                <img src="/covers/{{.Work.ID}}" alt="{{.Work.Title}}" class="w-full h-full object-cover">
+                <img src="/covers/{{.Work.ID}}?v={{.Work.UpdatedAt.Unix}}" alt="{{.Work.Title}}" class="w-full h-full object-cover">
             {{else}}
                 {{coverInitials .Work.Title}}
             {{end}}
         </div>
-        {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}
-        {{if not .Work.HasCover}}
-            <div class="mt-2 text-center text-sm text-text-muted">No cover</div>
-        {{end}}
-        {{end}}{{end}}
     </div>
 
     {{/* Details */}}
@@ -45,21 +40,34 @@
         {{end}}
 
         {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}
-            <div class="mt-4">
-                <a href="/admin/works/{{.Work.ID}}/edit" class="btn btn-surface btn-sm">✏️ Edit</a>
+            <div class="mt-4 flex gap-2 flex-wrap">
+                <a href="/admin/works/{{.Work.ID}}/edit" class="btn btn-surface btn-sm">✏️ Edit Work</a>
             </div>
         {{end}}{{end}}
     </div>
 </div>
 
-{{/* ── Cover art management (admin only) ── */}}
+{{/* ── Admin panel: metadata + cover management ── */}}
 {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}
-<div class="mt-6 p-4 border border-border rounded-md bg-surface">
-    <h3 class="mt-0 text-base">🖼️ Cover Art</h3>
+<div class="mt-6 p-4 border border-border rounded-md bg-surface space-y-4">
+    <h3 class="mt-0 text-base">🔍 Metadata Lookup</h3>
+    <form hx-get="/admin/works/{{.Work.ID}}/metadata/search"
+          hx-target="#metadata-results"
+          hx-swap="innerHTML"
+          hx-indicator="#metadata-spinner"
+          class="flex gap-2 items-center">
+        <input type="text" name="q" value="{{.Work.Title}}" placeholder="Search title, author, or ISBN..." class="flex-1">
+        <button type="submit" class="btn btn-primary btn-sm">Search Metadata</button>
+        <span id="metadata-spinner" class="htmx-indicator text-sm text-text-muted">Searching...</span>
+    </form>
+    <div id="metadata-results"></div>
+    <div id="metadata-status"></div>
 
-    {{/* Edition cover picker */}}
+    {{/* Cover art section */}}
+    <h3 class="text-base border-t border-border pt-4">🖼️ Cover Art</h3>
+
     {{if gt (len .EditionsWithCovers) 1}}
-    <div class="mb-4">
+    <div>
         <div class="text-sm text-text-muted mb-2">Use cover from edition:</div>
         <div class="flex gap-3 flex-wrap">
             {{range .EditionsWithCovers}}
@@ -73,16 +81,15 @@
     </div>
     {{end}}
 
-    {{/* Online cover search */}}
     <div>
-        <div class="text-sm text-text-muted mb-2">Search online:</div>
+        <div class="text-sm text-text-muted mb-2">Search covers online:</div>
         <form hx-get="/admin/works/{{.Work.ID}}/covers/search"
               hx-target="#cover-results"
               hx-swap="innerHTML"
               hx-indicator="#cover-spinner"
               class="flex gap-2 items-center">
-            <input type="text" name="q" value="{{.Work.Title}}" placeholder="Search title, author, or ISBN..." class="flex-1">
-            <button type="submit" class="btn btn-primary btn-sm">Search</button>
+            <input type="text" name="q" value="{{.Work.Title}}" placeholder="Search for cover art..." class="flex-1">
+            <button type="submit" class="btn btn-primary btn-sm">Search Covers</button>
             <span id="cover-spinner" class="htmx-indicator text-sm text-text-muted">Searching...</span>
         </form>
         <div id="cover-results" class="mt-3"></div>
@@ -157,7 +164,7 @@
         </div>
     </div>
 
-    {{/* Row 2: File metadata */}}
+    {{/* Row 2: File metadata (always visible) */}}
     <div class="flex gap-6 flex-wrap text-xs text-text-muted mt-2 pt-2 border-t border-border">
         {{if .ISBN}}<span>ISBN: <strong class="text-text">{{.ISBN}}</strong></span>{{end}}
         {{if .FileSize}}<span>Size: {{formatBytes .FileSize}}</span>{{end}}
@@ -167,7 +174,7 @@
         {{if .FileHash}}<span title="{{.FileHash}}">Hash: {{printf "%.12s" .FileHash}}…</span>{{end}}
     </div>
 
-    {{/* Row 3: Admin — file path + inline edit */}}
+    {{/* Row 3: Admin details (file path + edit toggle) */}}
     {{if $.CurrentUser}}{{if $.CurrentUser.IsAdmin}}
     <div class="mt-2 pt-2 border-t border-dashed border-border">
         {{if .FilePath}}
@@ -176,10 +183,14 @@
         </div>
         {{end}}
 
+        {{/* Edit toggle button */}}
+        <button class="btn btn-surface btn-sm text-xs edition-edit-toggle" onclick="this.nextElementSibling.classList.toggle('hidden'); this.textContent = this.textContent === '✏️ Edit' ? '✕ Close' : '✏️ Edit';" type="button">✏️ Edit</button>
+
+        {{/* Edit form (hidden by default) */}}
         <form hx-post="/admin/editions/{{.ID}}"
               hx-target="#edition-status-{{.ID}}"
               hx-swap="innerHTML"
-              class="flex gap-2 items-center flex-wrap">
+              class="hidden mt-2 flex gap-2 items-center flex-wrap">
             <label class="text-xs font-medium whitespace-nowrap">ISBN:</label>
             <input type="text" name="isbn" value="{{.ISBN}}" placeholder="Enter ISBN"
                    class="w-56 text-xs py-1 px-2">
@@ -203,12 +214,28 @@
 {{end}}
 
 <script nonce="{{.Nonce}}">
+// Close send dropdowns when clicking outside.
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.send-dropdown')) {
         document.querySelectorAll('.send-dropdown.open').forEach(function(el) {
             el.classList.remove('open');
         });
     }
+});
+
+// Refresh cover image when cover is updated via HTMX.
+document.body.addEventListener('coverUpdated', function() {
+    var img = document.querySelector('#work-cover img');
+    if (img) {
+        img.src = img.src.split('?')[0] + '?v=' + Date.now();
+    } else {
+        location.reload();
+    }
+});
+
+// Refresh page when metadata is applied.
+document.body.addEventListener('metadataUpdated', function() {
+    setTimeout(function() { location.reload(); }, 1500);
 });
 </script>
 {{end}}
