@@ -22,6 +22,10 @@
                 📝 Missing description
                 {{with index .Counts "no-description"}}<span class="ml-auto badge bg-error text-white text-xs">{{.}}</span>{{end}}
             </a>
+            <a href="/admin/librarian?issue=duplicates&format={{$.Format}}{{if $.ShowHidden}}&show_hidden=1{{end}}" class="btn btn-sm {{if eq $issue "duplicates"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
+                🔍 Duplicate works
+                {{with index .Counts "duplicates"}}<span class="ml-auto badge bg-error text-white text-xs">{{.}}</span>{{end}}
+            </a>
             <a href="/admin/librarian?issue=hidden&format={{$.Format}}" class="btn btn-sm {{if eq $issue "hidden"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
                 👁️‍🗨️ Hidden works
                 {{with index .Counts "hidden"}}<span class="ml-auto badge bg-surface text-text-muted text-xs">{{.}}</span>{{end}}
@@ -37,10 +41,11 @@
                 {{else if eq .Issue "no-cover"}}Missing Cover
                 {{else if eq .Issue "no-author"}}Missing Author
                 {{else if eq .Issue "no-description"}}Missing Description
+                {{else if eq .Issue "duplicates"}}Duplicate Works
                 {{else if eq .Issue "hidden"}}Hidden Works
                 {{end}}
             </h2>
-            <span class="text-text-muted text-sm">{{.Total}} works</span>
+            <span class="text-text-muted text-sm">{{.Total}} {{if eq .Issue "duplicates"}}groups{{else}}works{{end}}</span>
             <select x-data x-on:change="window.location.href='/admin/librarian?issue={{.Issue}}&format='+$el.value+'{{if .ShowHidden}}&show_hidden=1{{end}}'" class="w-auto text-sm ml-auto">
                 <option value="" {{if eq .Format ""}}selected{{end}}>All formats</option>
                 <option value="epub" {{if eq .Format "epub"}}selected{{end}}>EPUB</option>
@@ -58,7 +63,70 @@
             {{end}}
         </div>
 
-        {{if .Works}}
+        {{if eq .Issue "duplicates"}}
+            {{if .Duplicates}}
+            <div class="space-y-4">
+                {{range .Duplicates}}
+                <section class="border border-border rounded-md bg-surface/40 overflow-hidden">
+                    <div class="px-3 py-2 bg-surface border-b border-border flex items-center gap-2">
+                        <h3 class="m-0 text-sm">{{.Key}}</h3>
+                        <span class="badge bg-error text-white text-xs ml-auto">{{len .Works}} copies</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="text-sm w-full m-0">
+                            <thead>
+                                <tr>
+                                    <th class="w-10"></th>
+                                    <th class="text-left">Title</th>
+                                    <th class="text-left">Author</th>
+                                    <th class="text-center w-16">Cover</th>
+                                    <th class="text-center w-16">Desc</th>
+                                    <th class="text-center w-24">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {{range .Works}}
+                                <tr class="hover:bg-surface-hover transition {{if .Hidden}}opacity-50{{end}}">
+                                    <td class="py-1">
+                                        {{if .HasCover}}<img src="/covers/{{.ID}}?v={{.UpdatedAt.Unix}}" class="w-8 h-10 object-cover rounded" loading="lazy">
+                                        {{else}}<div class="w-8 h-10 bg-surface rounded flex items-center justify-center text-xs text-text-muted">—</div>{{end}}
+                                    </td>
+                                    <td class="py-1">
+                                        <a href="/works/{{.ID}}" class="font-medium">{{.Title}}</a>
+                                        {{if .Hidden}}<span class="badge bg-surface text-text-muted text-xs ml-1">hidden</span>{{end}}
+                                    </td>
+                                    <td class="py-1 text-text-muted">{{.PrimaryAuthor}}</td>
+                                    <td class="py-1 text-center">
+                                        {{if .HasCover}}<span class="text-green-600">✓</span>{{else}}<span class="text-error">✗</span>{{end}}
+                                    </td>
+                                    <td class="py-1 text-center">
+                                        {{if .Description}}<span class="text-green-600">✓</span>{{else}}<span class="text-error">✗</span>{{end}}
+                                    </td>
+                                    <td class="py-1 text-center">
+                                        <div class="flex gap-1 justify-center">
+                                            <a href="/works/{{.ID}}" class="btn btn-surface btn-sm text-xs py-0 px-1.5" title="Edit">✏️</a>
+                                            <button hx-post="/admin/works/{{.ID}}/hide"
+                                                    hx-target="closest tr"
+                                                    hx-swap="outerHTML"
+                                                    hx-confirm="{{if .Hidden}}Unhide{{else}}Hide{{end}} this work?"
+                                                    class="btn btn-surface btn-sm text-xs py-0 px-1.5"
+                                                    title="{{if .Hidden}}Unhide{{else}}Hide{{end}}">
+                                                {{if .Hidden}}👁️{{else}}🙈{{end}}
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {{end}}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                {{end}}
+            </div>
+            {{else}}
+            <p class="text-text-muted py-8 text-center">No duplicate works found.</p>
+            {{end}}
+        {{else if .Works}}
         {{/* ── Bulk action bar ── */}}
         <div class="flex items-center gap-2 mb-3 p-2 bg-surface border border-border rounded-md text-sm" x-show="selected.length > 0" x-cloak>
             <span class="text-text-muted" x-text="selected.length + ' selected'"></span>

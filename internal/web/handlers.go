@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -673,7 +674,59 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminDuplicates(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, "admin_duplicates.html", nil)
+	// Backward-compatible URL for bookmarks/tests; duplicates now live in Librarian.
+	r2 := r.Clone(r.Context())
+	u := *r.URL
+	q := u.Query()
+	q.Set("issue", "duplicates")
+	u.RawQuery = q.Encode()
+	r2.URL = &u
+	s.handleAdminLibrarian(w, r2)
+}
+
+type duplicateGroup struct {
+	Key   string
+	Works []domain.Work
+}
+
+func findDuplicateGroups(works []domain.Work) []duplicateGroup {
+	byKey := make(map[string][]domain.Work)
+	for _, w := range works {
+		title := strings.TrimSpace(strings.ToLower(w.SortTitle))
+		if title == "" {
+			title = strings.TrimSpace(strings.ToLower(domain.GenerateSortTitle(w.Title)))
+		}
+		author := strings.TrimSpace(domain.GenerateSortName(w.PrimaryAuthor()))
+		if title == "" || author == "" {
+			continue
+		}
+		key := title + "\x00" + author
+		byKey[key] = append(byKey[key], w)
+	}
+
+	groups := make([]duplicateGroup, 0)
+	for key, groupWorks := range byKey {
+		if len(groupWorks) > 1 {
+			parts := strings.SplitN(key, "\x00", 2)
+			display := groupWorks[0].Title
+			if len(parts) == 2 && parts[1] != "" {
+				display += " — " + groupWorks[0].PrimaryAuthor()
+			}
+			groups = append(groups, duplicateGroup{Key: display, Works: groupWorks})
+		}
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i].Key < groups[j].Key })
+	return groups
+}
+
+func duplicateWorkIDs(groups []duplicateGroup) map[int64]bool {
+	ids := make(map[int64]bool)
+	for _, group := range groups {
+		for _, w := range group.Works {
+			ids[w.ID] = true
+		}
+	}
+	return ids
 }
 
 func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
@@ -708,17 +761,31 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 		filter.IncludeHidden = showHidden
 	case "hidden":
 		filter.OnlyHidden = true
+	case "duplicates":
+		filter.IncludeHidden = showHidden
 	default:
 		filter.IncludeHidden = showHidden
 	}
 
 	works, total, _ := s.store.ListWorks(filter)
+	duplicateGroups := findDuplicateGroups(works)
 
-	// If "all" mode (no specific issue), filter to works that have at least one issue.
-	if issue == "" {
+	if issue == "duplicates" {
+		ids := duplicateWorkIDs(duplicateGroups)
+		var duplicateWorks []domain.Work
+		for _, w := range works {
+			if ids[w.ID] {
+				duplicateWorks = append(duplicateWorks, w)
+			}
+		}
+		works = duplicateWorks
+		total = len(duplicateGroups)
+	} else if issue == "" {
+		// If "all" mode (no specific issue), filter to works that have at least one issue.
+		ids := duplicateWorkIDs(duplicateGroups)
 		var filtered []domain.Work
 		for _, w := range works {
-			if !w.HasCover() || len(w.Authors) == 0 || w.Description == "" {
+			if !w.HasCover() || len(w.Authors) == 0 || w.Description == "" || ids[w.ID] {
 				filtered = append(filtered, w)
 			}
 		}
@@ -740,6 +807,7 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 			counts["no-description"]++
 		}
 	}
+	counts["duplicates"] = len(findDuplicateGroups(allWorks))
 	// Hidden count always queries all works (regardless of showHidden toggle).
 	allWithHidden, _, _ := s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, IncludeHidden: true, Format: format})
 	for _, w := range allWithHidden {
@@ -756,6 +824,7 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 		"Format":     format,
 		"ShowHidden": showHidden,
 		"Counts":     counts,
+		"Duplicates": duplicateGroups,
 	}
 
 	s.render(w, r, "admin_librarian.html", data)

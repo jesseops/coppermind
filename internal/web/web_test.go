@@ -347,6 +347,22 @@ func TestRateLimit(t *testing.T) {
 	}
 }
 
+func TestFindDuplicateGroups(t *testing.T) {
+	works := []domain.Work{
+		{ID: 1, Title: "The Hobbit", SortTitle: "hobbit, the", Authors: []domain.WorkAuthor{{Role: domain.RoleAuthorOf, AuthorName: "J.R.R. Tolkien"}}},
+		{ID: 2, Title: "Hobbit, The", SortTitle: "hobbit, the", Authors: []domain.WorkAuthor{{Role: domain.RoleAuthorOf, AuthorName: "J.R.R. Tolkien"}}},
+		{ID: 3, Title: "The Hobbit", SortTitle: "hobbit, the", Authors: []domain.WorkAuthor{{Role: domain.RoleAuthorOf, AuthorName: "Someone Else"}}},
+	}
+
+	groups := findDuplicateGroups(works)
+	if len(groups) != 1 {
+		t.Fatalf("got %d duplicate groups, want 1", len(groups))
+	}
+	if len(groups[0].Works) != 2 {
+		t.Fatalf("got %d duplicate works, want 2", len(groups[0].Works))
+	}
+}
+
 func TestTemplateSmoke(t *testing.T) {
 	env := newTestEnv(t)
 	env.createUser("admin", "pass", domain.RoleAdmin)
