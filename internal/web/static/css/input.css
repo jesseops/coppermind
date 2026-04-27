@@ -287,4 +287,34 @@
     z-index: 50; min-width: 220px; overflow: hidden;
   }
   .send-dropdown.open .send-dropdown-menu { display: block; }
+
+  /* Card action menu (catalogue grid) */
+  .card-actions {
+    position: absolute; top: 0.375rem; right: 0.375rem;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .work-card:hover .card-actions,
+  .card-actions.open { opacity: 1; }
+  .card-actions-btn {
+    width: 1.5rem; height: 1.5rem; border-radius: 50%;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    color: var(--color-text); cursor: pointer; font-size: 0.8rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px var(--color-shadow);
+  }
+  .card-actions-btn:hover { background: var(--color-surface-hover); }
+  .card-actions-menu {
+    display: none; position: absolute; right: 0; top: calc(100% + 4px);
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: 0.375rem; box-shadow: 0 4px 12px var(--color-shadow);
+    z-index: 60; min-width: 160px; overflow: hidden;
+  }
+  .card-actions.open .card-actions-menu { display: block; }
+  .card-action {
+    display: block; padding: 0.375rem 0.75rem; font-size: 0.8rem;
+    text-decoration: none; color: var(--color-text); cursor: pointer;
+    border: none; background: none; transition: background-color 0.1s;
+  }
+  .card-action:hover { background: var(--color-surface-hover); text-decoration: none; }
+  .card-action-divider { border-top: 1px solid var(--color-border); margin: 0.25rem 0; }
 }

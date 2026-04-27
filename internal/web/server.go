@@ -236,16 +236,28 @@ func (s *Server) buildRouter() chi.Router {
 		r.Use(auth.CSRFProtect)
 
 		// Public routes.
-		r.Get("/", s.handleHome)
+		r.Get("/", s.handleCatalogue)
 		r.Get("/works/{id}", s.handleWorkDetail)
-		r.Get("/authors", s.handleAuthors)
-		r.Get("/authors/{id}", s.handleAuthorDetail)
-		r.Get("/series", s.handleSeriesList)
-		r.Get("/series/{id}", s.handleSeriesDetail)
 		r.Get("/covers/{id}", s.handleCover)
 		r.Get("/covers/edition/{id}", s.handleEditionCover)
 		r.Get("/download/{id}", s.handleDownload)
 		r.Get("/receive", s.handleReceivePage)
+
+		// Legacy redirects.
+		r.Get("/authors", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/?group=author", http.StatusMovedPermanently)
+		})
+		r.Get("/authors/{id}", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			http.Redirect(w, r, "/?author="+id, http.StatusMovedPermanently)
+		})
+		r.Get("/series", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/?group=series", http.StatusMovedPermanently)
+		})
+		r.Get("/series/{id}", func(w http.ResponseWriter, r *http.Request) {
+			id := chi.URLParam(r, "id")
+			http.Redirect(w, r, "/?series="+id, http.StatusMovedPermanently)
+		})
 
 		// Auth routes.
 		r.Get("/login", s.handleLoginForm)
@@ -394,9 +406,18 @@ func (s *Server) renderPartial(w http.ResponseWriter, r *http.Request, name stri
 	data["CSRFToken"] = auth.CSRFToken(r)
 	data["CurrentUser"] = auth.UserFromContext(r.Context())
 
-	// For partials, look for the named block in home.html (which defines works_grid).
-	tpl, ok := s.pages["home.html"]
-	if !ok {
+	// Try catalogue.html first (has catalogue_results, catalogue_grid, catalogue_list),
+	// then fall back to home.html for legacy works_grid partial.
+	var tpl *template.Template
+	for _, pageName := range []string{"catalogue.html", "home.html"} {
+		if t, ok := s.pages[pageName]; ok {
+			if t.Lookup(name) != nil {
+				tpl = t
+				break
+			}
+		}
+	}
+	if tpl == nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}

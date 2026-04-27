@@ -30,8 +30,11 @@
         <div class="flex items-center gap-4 flex-wrap">
             <a href="/" class="font-bold text-lg no-underline">📚 Coppermind</a>
             <a href="/" class="font-medium">Library</a>
-            <a href="/authors" class="font-medium">Authors</a>
-            <a href="/series" class="font-medium">Series</a>
+            <a href="/?group=author" class="font-medium">By Author</a>
+            <a href="/?group=series" class="font-medium">By Series</a>
+            {{if .CurrentUser}}
+            <a href="/me/shelves" class="font-medium">Shelves</a>
+            {{end}}
             <a href="/receive" class="font-medium" title="Send books to your e-reader">📲 Receive</a>
         </div>
         <div class="flex items-center gap-4 flex-wrap">

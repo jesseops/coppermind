@@ -185,6 +185,12 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 		)`)
 		args = append(args, filter.AuthorID)
 	}
+	if filter.ShelfID > 0 {
+		where = append(where, `EXISTS (
+			SELECT 1 FROM shelf_works sw WHERE sw.work_id = w.id AND sw.shelf_id = ?
+		)`)
+		args = append(args, filter.ShelfID)
+	}
 
 	whereClause := strings.Join(where, " AND ")
 
@@ -199,13 +205,15 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 	orderBy := "w.created_at DESC"
 	switch strings.ToLower(filter.SortBy) {
 	case "title":
-		orderBy = "w.sort_title"
+		orderBy = "w.sort_title ASC"
+	case "author":
+		orderBy = "w.sort_title ASC" // will be overridden by grouping in handler
 	case "updated_at":
 		orderBy = "w.updated_at DESC"
 	case "series":
 		orderBy = "w.series_id, w.series_index"
 	case "year":
-		orderBy = "w.first_published"
+		orderBy = "w.first_published DESC"
 	}
 	if strings.EqualFold(filter.SortOrder, "asc") && !strings.Contains(orderBy, "ASC") && !strings.Contains(orderBy, "DESC") {
 		orderBy += " ASC"

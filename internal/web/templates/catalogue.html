@@ -1,0 +1,197 @@
+{{define "title"}}Library — Coppermind{{end}}
+{{define "content"}}
+<div class="flex justify-between items-center my-4 flex-wrap gap-2">
+    <div>
+        <h1 class="inline">
+            {{if .FilterAuthorName}}{{.FilterAuthorName}}
+            {{else if .FilterSeriesName}}{{.FilterSeriesName}}
+            {{else if .FilterShelfName}}📚 {{.FilterShelfName}}
+            {{else}}Library
+            {{end}}
+        </h1>
+        <span class="text-text-muted text-sm ml-2">{{.Total}} works</span>
+    </div>
+    {{if or .FilterAuthorName .FilterSeriesName .FilterShelfName}}
+    <a href="/" class="btn btn-surface btn-sm">← All works</a>
+    {{end}}
+</div>
+
+{{/* ── Toolbar ── */}}
+<div class="flex flex-wrap gap-2 my-4 items-center">
+    <input type="search" name="q" value="{{.Query}}" placeholder="Search..."
+           hx-get="/" hx-trigger="keyup changed delay:300ms" hx-target="#catalogue-results"
+           hx-push-url="true" hx-include=".catalogue-filter"
+           class="flex-1 min-w-[200px]">
+    <select name="group" class="catalogue-filter w-auto" hx-get="/" hx-trigger="change"
+            hx-target="#catalogue-results" hx-push-url="true" hx-include=".catalogue-filter,[name='q']">
+        <option value="" {{if eq .Group ""}}selected{{end}}>No grouping</option>
+        <option value="author" {{if eq .Group "author"}}selected{{end}}>By Author</option>
+        <option value="series" {{if eq .Group "series"}}selected{{end}}>By Series</option>
+    </select>
+    <select name="sort" class="catalogue-filter w-auto" hx-get="/" hx-trigger="change"
+            hx-target="#catalogue-results" hx-push-url="true" hx-include=".catalogue-filter,[name='q']">
+        <option value="recent" {{if eq .Sort "recent"}}selected{{end}}>Recent</option>
+        <option value="title" {{if eq .Sort "title"}}selected{{end}}>Title</option>
+        <option value="author" {{if eq .Sort "author"}}selected{{end}}>Author</option>
+        <option value="year" {{if eq .Sort "year"}}selected{{end}}>Year</option>
+    </select>
+    <select name="type" class="catalogue-filter w-auto" hx-get="/" hx-trigger="change"
+            hx-target="#catalogue-results" hx-push-url="true" hx-include=".catalogue-filter,[name='q']">
+        <option value="" {{if eq .Type ""}}selected{{end}}>All types</option>
+        <option value="ebook" {{if eq .Type "ebook"}}selected{{end}}>Ebooks</option>
+        <option value="audiobook" {{if eq .Type "audiobook"}}selected{{end}}>Audiobooks</option>
+    </select>
+    <div class="flex border border-border rounded-md overflow-hidden">
+        <a href="/?view=grid&q={{.Query}}&sort={{.Sort}}&type={{.Type}}&group={{.Group}}"
+           class="px-2 py-1 text-sm {{if eq .View "grid"}}bg-primary text-white{{else}}bg-surface text-text-muted hover:bg-surface-hover{{end}} no-underline"
+           title="Grid view">▦</a>
+        <a href="/?view=list&q={{.Query}}&sort={{.Sort}}&type={{.Type}}&group={{.Group}}"
+           class="px-2 py-1 text-sm {{if eq .View "list"}}bg-primary text-white{{else}}bg-surface text-text-muted hover:bg-surface-hover{{end}} no-underline"
+           title="List view">☰</a>
+    </div>
+    {{/* Hidden fields for author/series/shelf filters */}}
+    {{if .AuthorID}}<input type="hidden" name="author" value="{{.AuthorID}}" class="catalogue-filter">{{end}}
+    {{if .SeriesID}}<input type="hidden" name="series" value="{{.SeriesID}}" class="catalogue-filter">{{end}}
+    {{if .ShelfID}}<input type="hidden" name="shelf" value="{{.ShelfID}}" class="catalogue-filter">{{end}}
+    <input type="hidden" name="view" value="{{.View}}" class="catalogue-filter">
+</div>
+
+<div id="catalogue-results">
+{{template "catalogue_results" .}}
+</div>
+{{end}}
+
+{{define "catalogue_results"}}
+{{if .Groups}}
+    {{/* ── Grouped view ── */}}
+    {{range .Groups}}
+    <details class="mb-4 border border-border rounded-md overflow-hidden" open>
+        <summary class="flex justify-between items-center px-4 py-2 bg-surface cursor-pointer hover:bg-surface-hover font-semibold">
+            <span>{{.Name}}</span>
+            <span class="text-text-muted text-sm font-normal">{{len .Works}} works</span>
+        </summary>
+        <div class="p-3">
+            {{if eq $.View "list"}}
+                {{template "catalogue_list" dict "Works" .Works "Shelves" $.Shelves "EditionMap" $.EditionMap "CurrentUser" $.CurrentUser "Nonce" $.Nonce}}
+            {{else}}
+                {{template "catalogue_grid" dict "Works" .Works "Shelves" $.Shelves "EditionMap" $.EditionMap "CurrentUser" $.CurrentUser "Nonce" $.Nonce}}
+            {{end}}
+        </div>
+    </details>
+    {{end}}
+{{else if eq .View "list"}}
+    {{template "catalogue_list" .}}
+{{else}}
+    {{template "catalogue_grid" .}}
+{{end}}
+
+{{if and (not .Works) (not .Groups)}}
+<p class="text-center text-text-muted py-8">
+    No works found.
+    {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}<a href="/admin/import">Import some books</a>{{end}}{{end}}
+</p>
+{{end}}
+{{end}}
+
+{{define "catalogue_grid"}}
+<div class="works-grid">
+    {{range .Works}}
+    <div class="work-card relative group">
+        <a href="/works/{{.ID}}" class="no-underline text-inherit">
+            <div class="cover">
+                {{if .HasCover}}
+                    <img src="/covers/{{.ID}}" alt="{{.Title}}" loading="lazy">
+                {{else}}
+                    {{coverInitials .Title}}
+                {{end}}
+            </div>
+            <div class="title">{{.Title}}</div>
+            <div class="author">{{.PrimaryAuthor}}</div>
+            <div class="badges">
+                {{if .HasEbook}}<span class="badge badge-ebook">epub</span>{{end}}
+                {{if .HasAudiobook}}<span class="badge badge-audiobook">audio</span>{{end}}
+            </div>
+        </a>
+        {{/* Card action menu */}}
+        <div class="card-actions">
+            <button class="card-actions-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Actions">⋮</button>
+            <div class="card-actions-menu">
+                {{$ed := index $.EditionMap .ID}}
+                {{if $ed}}
+                    {{if $ed.IsEbook}}
+                    <a href="/read/{{$ed.ID}}" class="card-action">📖 Read</a>
+                    {{else}}
+                    <a href="/listen/{{$ed.ID}}" class="card-action">🎧 Listen</a>
+                    {{end}}
+                    <a href="/download/{{$ed.ID}}" class="card-action">⬇️ Download</a>
+                    <div class="card-action send-inline" onclick="event.stopPropagation()">
+                        <form hx-post="/receive/send/{{$ed.ID}}" hx-target="closest .card-actions-menu" hx-swap="innerHTML"
+                              class="flex gap-1 items-center px-2 py-1">
+                            <span class="text-xs">📲</span>
+                            <input type="text" name="code" placeholder="CODE" maxlength="4" required
+                                   class="w-14 text-xs p-0.5 uppercase text-center font-mono">
+                            <button type="submit" class="btn btn-primary btn-sm text-xs py-0 px-1">Go</button>
+                        </form>
+                    </div>
+                {{end}}
+                {{if $.CurrentUser}}
+                    {{if $.Shelves}}
+                    <div class="card-action-divider"></div>
+                    {{range $.Shelves}}
+                    <button hx-post="/shelves/{{.ID}}/add" hx-vals='{"work_id":"{{$.ID}}"}' hx-swap="none"
+                            class="card-action w-full text-left">📚 {{.Name}}</button>
+                    {{end}}
+                    {{end}}
+                {{end}}
+            </div>
+        </div>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "catalogue_list"}}
+<div class="overflow-x-auto">
+<table class="text-sm">
+    <thead>
+        <tr>
+            <th class="w-8"></th>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Series</th>
+            <th>Year</th>
+            <th>Format</th>
+            <th class="w-20">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Works}}
+        <tr class="hover:bg-surface-hover transition">
+            <td>
+                {{if .HasCover}}<img src="/covers/{{.ID}}" class="w-8 h-10 object-cover rounded" loading="lazy">
+                {{else}}<div class="w-8 h-10 bg-surface rounded flex items-center justify-center text-xs text-text-muted">{{coverInitials .Title}}</div>{{end}}
+            </td>
+            <td><a href="/works/{{.ID}}" class="font-medium">{{.Title}}</a></td>
+            <td class="text-text-muted">{{.PrimaryAuthor}}</td>
+            <td class="text-text-muted">{{if .SeriesName}}{{.SeriesName}}{{if .SeriesIndex}} #{{.SeriesIndex}}{{end}}{{end}}</td>
+            <td class="text-text-muted">{{if .FirstPublished}}{{.FirstPublished}}{{end}}</td>
+            <td>
+                {{if .HasEbook}}<span class="badge badge-ebook">epub</span>{{end}}
+                {{if .HasAudiobook}}<span class="badge badge-audiobook">audio</span>{{end}}
+            </td>
+            <td>
+                {{$ed := index $.EditionMap .ID}}
+                {{if $ed}}
+                <div class="flex gap-1">
+                    {{if $ed.IsEbook}}<a href="/read/{{$ed.ID}}" class="btn btn-primary btn-sm text-xs py-0 px-1" title="Read">📖</a>
+                    {{else}}<a href="/listen/{{$ed.ID}}" class="btn btn-primary btn-sm text-xs py-0 px-1" title="Listen">🎧</a>{{end}}
+                    <a href="/download/{{$ed.ID}}" class="btn btn-surface btn-sm text-xs py-0 px-1" title="Download">⬇️</a>
+                </div>
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+</div>
+{{end}}

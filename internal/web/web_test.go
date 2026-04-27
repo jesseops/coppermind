@@ -356,8 +356,10 @@ func TestTemplateSmoke(t *testing.T) {
 
 	pages := []string{
 		"/",
-		"/authors",
-		"/series",
+		"/?group=author",
+		"/?group=series",
+		"/?view=list",
+		"/?sort=title&type=ebook",
 		"/me",
 		"/me/shelves",
 		"/me/reading",

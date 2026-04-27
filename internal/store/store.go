@@ -95,7 +95,8 @@ type WorkFilter struct {
 	Type      string // "ebook", "audiobook", or "" for all
 	SeriesID  int64
 	AuthorID  int64
-	SortBy    string // "title", "author", "created_at", "updated_at", "series"
+	ShelfID   int64
+	SortBy    string // "title", "author", "created_at", "updated_at", "series", "year"
 	SortOrder string // "asc" or "desc"
 	Limit     int
 	Offset    int
