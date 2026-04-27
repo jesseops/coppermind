@@ -222,14 +222,32 @@ func (s *Server) handleReader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-set reading state when opening.
+	user := auth.UserFromContext(r.Context())
+	if user != nil {
+		totalChapters := len(chapters)
+		progress := 0.0
+		if totalChapters > 0 {
+			progress = float64(chapter) / float64(totalChapters)
+		}
+		s.store.SaveReadingState(&domain.ReadingState{
+			UserID:       user.ID,
+			EditionID:    id,
+			Status:       domain.ReadingStatusReading,
+			Progress:     progress,
+			ChapterIndex: chapter,
+		})
+	}
+
 	work, _ := s.store.GetWork(edition.WorkID)
 	s.render(w, r, "reader.html", templateData{
-		"Work":        work,
-		"Edition":     edition,
-		"ChapterHTML": template.HTML(chapterHTML),
-		"ChapterPath": chapterPath,
-		"Chapters":    chapters,
-		"CurrentCh":   chapter,
+		"Work":          work,
+		"Edition":       edition,
+		"ChapterHTML":   template.HTML(chapterHTML),
+		"ChapterPath":   chapterPath,
+		"Chapters":      chapters,
+		"CurrentCh":     chapter,
+		"TotalChapters": len(chapters),
 	})
 }
 
@@ -244,6 +262,17 @@ func (s *Server) handlePlayer(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("list tracks", "edition_id", id, "err", err)
 	}
+
+	// Auto-set reading state when opening player.
+	user := auth.UserFromContext(r.Context())
+	if user != nil {
+		s.store.SaveReadingState(&domain.ReadingState{
+			UserID:    user.ID,
+			EditionID: id,
+			Status:    domain.ReadingStatusReading,
+		})
+	}
+
 	work, _ := s.store.GetWork(edition.WorkID)
 	s.render(w, r, "player.html", templateData{
 		"Work":    work,
@@ -315,10 +344,15 @@ func (s *Server) handleSaveReadingState(w http.ResponseWriter, r *http.Request) 
 	progress, _ := strconv.ParseFloat(r.FormValue("progress"), 64)
 	chapterIndex, _ := strconv.Atoi(r.FormValue("chapter_index"))
 
+	status := r.FormValue("status")
+	if status == "" {
+		status = domain.ReadingStatusReading
+	}
+
 	s.store.SaveReadingState(&domain.ReadingState{
 		UserID:       user.ID,
 		EditionID:    editionID,
-		Status:       domain.ReadingStatusReading,
+		Status:       status,
 		Progress:     progress,
 		ChapterIndex: chapterIndex,
 	})

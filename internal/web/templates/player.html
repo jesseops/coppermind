@@ -1,13 +1,49 @@
 {{define "title"}}Listening: {{.Work.Title}} — Coppermind{{end}}
 {{define "content"}}
-<h1>{{.Work.Title}}</h1>
+<div class="flex items-center justify-between my-4">
+    <h1>{{.Work.Title}}</h1>
+    <a href="/works/{{.Work.ID}}" class="btn btn-surface btn-sm">← Back</a>
+</div>
 <div class="mt-4">
     {{range .Tracks}}
     <div class="flex items-center gap-4 py-2 border-b border-border">
         <span class="text-text-muted min-w-8">{{.TrackIndex}}</span>
         <span class="flex-1">{{if .Title}}{{.Title}}{{else}}Track {{.TrackIndex}}{{end}}</span>
-        <audio controls preload="none" class="h-8"><source src="/audio/{{.ID}}"></audio>
+        <audio controls preload="none" class="h-8" data-track-index="{{.TrackIndex}}" data-track-id="{{.ID}}"><source src="/audio/{{.ID}}"></audio>
     </div>
     {{end}}
 </div>
+
+<script nonce="{{.Nonce}}">
+(function() {
+    var editionID = {{.Edition.ID}};
+    var totalTracks = {{len .Tracks}};
+    var currentTrack = 0;
+
+    function saveProgress(trackIndex, seconds) {
+        var progress = totalTracks > 0 ? trackIndex / totalTracks : 0;
+        var body = 'progress=' + progress + '&chapter_index=' + trackIndex;
+        if (seconds) body += '&position_seconds=' + seconds;
+        var x = new XMLHttpRequest();
+        x.open('POST', '/api/v1/me/reading/' + editionID, true);
+        x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        x.setRequestHeader('X-CSRF-Token', document.body.getAttribute('hx-headers') ? JSON.parse(document.body.getAttribute('hx-headers'))['X-CSRF-Token'] : '');
+        x.send(body);
+    }
+
+    // Track play/pause events.
+    document.querySelectorAll('audio').forEach(function(el) {
+        el.addEventListener('play', function() {
+            currentTrack = parseInt(el.getAttribute('data-track-index')) || 0;
+            saveProgress(currentTrack, 0);
+        });
+        el.addEventListener('pause', function() {
+            saveProgress(currentTrack, Math.floor(el.currentTime));
+        });
+        el.addEventListener('ended', function() {
+            saveProgress(currentTrack, Math.floor(el.duration));
+        });
+    });
+})();
+</script>
 {{end}}
