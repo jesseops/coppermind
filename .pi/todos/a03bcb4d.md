@@ -6,9 +6,8 @@
     "should-fix",
     "phase-2"
   ],
-  "status": "open",
-  "created_at": "2026-04-27T15:10:04.383Z",
-  "assigned_to_session": "019dca13-bab2-757b-8af3-670d85b8173b"
+  "status": "done",
+  "created_at": "2026-04-27T15:10:04.383Z"
 }
 
 ## Problem

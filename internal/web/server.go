@@ -207,6 +207,7 @@ func (s *Server) buildRouter() chi.Router {
 	r.Use(securityHeaders)
 	r.Use(gzipMiddleware)
 	r.Use(auth.OptionalAuth(s.store, s.secret))
+	r.Use(s.guestGateMiddleware)
 	r.Use(s.setupCheckMiddleware)
 
 	// Static files (no CSRF needed).
@@ -297,6 +298,46 @@ func (s *Server) setupCheckMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// guestGateMiddleware enforces authentication when AllowGuests is false.
+// Skips auth-related paths so users can still log in.
+func (s *Server) guestGateMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Always allow if guests are permitted.
+		if s.config.AllowGuests {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Skip paths that must remain accessible.
+		path := r.URL.Path
+		if path == "/login" || path == "/logout" ||
+			strings.HasPrefix(path, "/setup") ||
+			strings.HasPrefix(path, "/static/") ||
+			strings.HasPrefix(path, "/receive/") ||
+			path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// If user is authenticated (via session or Basic Auth), allow.
+		user := auth.UserFromContext(r.Context())
+		if user != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// For API/OPDS requests, return 401 with WWW-Authenticate.
+		if strings.HasPrefix(path, "/api/") {
+			w.Header().Set("WWW-Authenticate", `Basic realm="Coppermind"`)
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
+			return
+		}
+
+		// For browser requests, redirect to login.
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 	})
 }
 

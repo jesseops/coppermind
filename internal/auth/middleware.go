@@ -24,30 +24,38 @@ func SetUserInContext(ctx context.Context, user *domain.User) context.Context {
 }
 
 // OptionalAuth is middleware that loads the user from the session cookie if present.
+// Also supports HTTP Basic Auth for API/OPDS clients.
 // Requests continue even without authentication.
 func OptionalAuth(s store.Store, secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Try session cookie first.
 			cookie, err := r.Cookie(CookieName)
-			if err != nil || cookie.Value == "" {
-				next.ServeHTTP(w, r)
-				return
+			if err == nil && cookie.Value != "" {
+				userID, err := ValidateSession(cookie.Value, secret)
+				if err == nil {
+					user, err := s.GetUser(userID)
+					if err == nil {
+						ctx := SetUserInContext(r.Context(), user)
+						next.ServeHTTP(w, r.WithContext(ctx))
+						return
+					}
+				}
 			}
 
-			userID, err := ValidateSession(cookie.Value, secret)
-			if err != nil {
-				next.ServeHTTP(w, r)
-				return
+			// Try HTTP Basic Auth (for API/OPDS clients).
+			if username, password, ok := r.BasicAuth(); ok {
+				user, err := s.GetUserByUsername(username)
+				if err == nil {
+					if CheckPassword(user.PasswordHash, password) == nil {
+						ctx := SetUserInContext(r.Context(), user)
+						next.ServeHTTP(w, r.WithContext(ctx))
+						return
+					}
+				}
 			}
 
-			user, err := s.GetUser(userID)
-			if err != nil {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			ctx := SetUserInContext(r.Context(), user)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r)
 		})
 	}
 }
