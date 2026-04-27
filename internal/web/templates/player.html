@@ -1,12 +1,12 @@
 {{define "title"}}Listening: {{.Work.Title}} — Coppermind{{end}}
 {{define "content"}}
 <h1>{{.Work.Title}}</h1>
-<div style="margin-top:1rem;">
+<div class="mt-4">
     {{range .Tracks}}
-    <div style="display:flex;align-items:center;gap:1rem;padding:0.5rem;border-bottom:1px solid var(--color-border);">
-        <span style="color:var(--color-text-muted);min-width:2rem;">{{.TrackIndex}}</span>
-        <span style="flex:1;">{{if .Title}}{{.Title}}{{else}}Track {{.TrackIndex}}{{end}}</span>
-        <audio controls preload="none" style="height:2rem;"><source src="/audio/{{.ID}}"></audio>
+    <div class="flex items-center gap-4 py-2 border-b border-border">
+        <span class="text-text-muted min-w-8">{{.TrackIndex}}</span>
+        <span class="flex-1">{{if .Title}}{{.Title}}{{else}}Track {{.TrackIndex}}{{end}}</span>
+        <audio controls preload="none" class="h-8"><source src="/audio/{{.ID}}"></audio>
     </div>
     {{end}}
 </div>

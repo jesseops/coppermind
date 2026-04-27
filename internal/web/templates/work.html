@@ -1,50 +1,51 @@
 {{define "title"}}{{.Work.Title}} — Coppermind{{end}}
 {{define "content"}}
-<div style="display:flex;gap:2rem;margin-top:1rem;flex-wrap:wrap;">
-    <div style="flex:0 0 200px;">
-        <div class="cover" style="width:200px;aspect-ratio:2/3;border-radius:0.5rem;overflow:hidden;background:var(--color-surface);display:flex;align-items:center;justify-content:center;font-size:3rem;color:var(--color-text-muted);">
+<div class="flex gap-8 mt-4 flex-wrap md:flex-nowrap">
+    {{/* Cover */}}
+    <div class="shrink-0 w-[200px]">
+        <div class="cover w-[200px] aspect-[2/3] rounded-lg overflow-hidden bg-surface flex items-center justify-center text-5xl text-text-muted">
             {{if .Work.HasCover}}
-                <img src="/covers/{{.Work.ID}}" alt="{{.Work.Title}}" style="width:100%;height:100%;object-fit:cover;">
+                <img src="/covers/{{.Work.ID}}" alt="{{.Work.Title}}" class="w-full h-full object-cover">
             {{else}}
                 {{coverInitials .Work.Title}}
             {{end}}
         </div>
         {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}
         {{if not .Work.HasCover}}
-            <div style="margin-top:0.5rem;text-align:center;">
-                <span style="font-size:0.8rem;color:var(--color-text-muted);">No cover</span>
-            </div>
+            <div class="mt-2 text-center text-sm text-text-muted">No cover</div>
         {{end}}
         {{end}}{{end}}
     </div>
-    <div style="flex:1;min-width:300px;">
+
+    {{/* Details */}}
+    <div class="flex-1 min-w-[250px]">
         <h1>{{.Work.Title}}</h1>
         {{range .Work.Authors}}
             <a href="/authors/{{.AuthorID}}">{{.AuthorName}}</a>{{if ne .Role "author"}} ({{.Role}}){{end}}
         {{end}}
         {{if .Work.SeriesName}}
-            <p style="color:var(--color-text-muted);margin-top:0.5rem;">
+            <p class="text-text-muted mt-2">
                 <a href="/series/{{.Work.SeriesID}}">{{.Work.SeriesName}}</a>
                 {{if .Work.SeriesIndex}} #{{.Work.SeriesIndex}}{{end}}
             </p>
         {{end}}
         {{if .Work.Description}}
-            <p style="margin-top:1rem;">{{.Work.Description}}</p>
+            <p class="mt-4">{{.Work.Description}}</p>
         {{end}}
         {{if .Work.FirstPublished}}
-            <p style="color:var(--color-text-muted);font-size:0.875rem;">First published: {{.Work.FirstPublished}}</p>
+            <p class="text-text-muted text-sm">First published: {{.Work.FirstPublished}}</p>
         {{end}}
         {{if .Work.Language}}
-            <p style="color:var(--color-text-muted);font-size:0.875rem;">Language: {{.Work.Language}}</p>
+            <p class="text-text-muted text-sm">Language: {{.Work.Language}}</p>
         {{end}}
         {{if .Tags}}
-            <div style="margin-top:0.5rem;">
-                {{range .Tags}}<span class="badge" style="background:var(--color-surface);">{{.}}</span> {{end}}
+            <div class="mt-2 flex gap-1 flex-wrap">
+                {{range .Tags}}<span class="badge bg-surface">{{.}}</span> {{end}}
             </div>
         {{end}}
 
         {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}
-            <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <div class="mt-4">
                 <a href="/admin/works/{{.Work.ID}}/edit" class="btn btn-surface btn-sm">✏️ Edit</a>
             </div>
         {{end}}{{end}}
@@ -53,19 +54,19 @@
 
 {{/* ── Cover art management (admin only) ── */}}
 {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}
-<div style="margin-top:1.5rem;padding:1rem;border:1px solid var(--color-border);border-radius:0.375rem;background:var(--color-surface);">
-    <h3 style="margin-top:0;font-size:1rem;">🖼️ Cover Art</h3>
+<div class="mt-6 p-4 border border-border rounded-md bg-surface">
+    <h3 class="mt-0 text-base">🖼️ Cover Art</h3>
 
-    {{/* Edition cover picker — show if multiple editions have covers */}}
+    {{/* Edition cover picker */}}
     {{if gt (len .EditionsWithCovers) 1}}
-    <div style="margin-bottom:1rem;">
-        <div style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:0.5rem;">Use cover from edition:</div>
-        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+    <div class="mb-4">
+        <div class="text-sm text-text-muted mb-2">Use cover from edition:</div>
+        <div class="flex gap-3 flex-wrap">
             {{range .EditionsWithCovers}}
-            <form hx-post="/admin/works/{{$.Work.ID}}/covers/apply" hx-target="#cover-status" hx-swap="innerHTML" style="text-align:center;">
+            <form hx-post="/admin/works/{{$.Work.ID}}/covers/apply" hx-target="#cover-status" hx-swap="innerHTML" class="text-center">
                 <input type="hidden" name="edition_id" value="{{.ID}}">
-                <img src="/covers/edition/{{.ID}}" alt="{{.Format}}" style="width:60px;height:90px;object-fit:cover;border-radius:0.25rem;border:1px solid var(--color-border);cursor:pointer;display:block;margin-bottom:0.25rem;">
-                <button type="submit" class="btn btn-sm btn-surface" style="font-size:0.7rem;">{{.Format}}{{if .Publisher}} · {{.Publisher}}{{end}}</button>
+                <img src="/covers/edition/{{.ID}}" alt="{{.Format}}" class="w-[60px] h-[90px] object-cover rounded border border-border cursor-pointer block mb-1">
+                <button type="submit" class="btn btn-sm btn-surface text-xs">{{.Format}}{{if .Publisher}} · {{.Publisher}}{{end}}</button>
             </form>
             {{end}}
         </div>
@@ -74,37 +75,37 @@
 
     {{/* Online cover search */}}
     <div>
-        <div style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:0.5rem;">Search online:</div>
+        <div class="text-sm text-text-muted mb-2">Search online:</div>
         <form hx-get="/admin/works/{{.Work.ID}}/covers/search"
               hx-target="#cover-results"
               hx-swap="innerHTML"
               hx-indicator="#cover-spinner"
-              style="display:flex;gap:0.5rem;align-items:center;">
-            <input type="text" name="q" value="{{.Work.Title}}" placeholder="Search title, author, or ISBN..." style="flex:1;">
+              class="flex gap-2 items-center">
+            <input type="text" name="q" value="{{.Work.Title}}" placeholder="Search title, author, or ISBN..." class="flex-1">
             <button type="submit" class="btn btn-primary btn-sm">Search</button>
-            <span id="cover-spinner" class="htmx-indicator" style="font-size:0.85rem;color:var(--color-text-muted);">Searching...</span>
+            <span id="cover-spinner" class="htmx-indicator text-sm text-text-muted">Searching...</span>
         </form>
-        <div id="cover-results" style="margin-top:0.75rem;"></div>
-        <div id="cover-status" style="margin-top:0.5rem;"></div>
+        <div id="cover-results" class="mt-3"></div>
+        <div id="cover-status" class="mt-2"></div>
     </div>
 </div>
 {{end}}{{end}}
 
-<h2 style="margin-top:2rem;">Editions</h2>
+<h2 class="mt-8">Editions</h2>
 {{range .Editions}}
-<div class="edition-card" style="flex-direction:column;align-items:stretch;">
+<div class="edition-card flex-col items-stretch">
     {{/* Row 1: Badge + meta + actions */}}
-    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <div class="flex items-center gap-4 flex-wrap">
         <div>
             {{if eq .EditionType "ebook"}}<span class="badge badge-ebook">{{.Format}}</span>
             {{else}}<span class="badge badge-audiobook">{{.Format}}</span>{{end}}
         </div>
-        <div style="flex:1;min-width:150px;">
+        <div class="flex-1 min-w-[150px]">
             {{if .Publisher}}<strong>{{.Publisher}}</strong>{{end}}
             {{if .PublishedYear}}{{if .Publisher}} · {{end}}{{.PublishedYear}}{{end}}
             {{if .Narrator}} · Narrated by {{.Narrator}}{{end}}
         </div>
-        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+        <div class="flex gap-2 items-center flex-wrap">
             {{if eq .EditionType "ebook"}}
                 <a href="/read/{{.ID}}" class="btn btn-primary btn-sm">Read</a>
             {{else}}
@@ -120,22 +121,22 @@
                     Send via… ▾
                 </button>
                 <div class="send-dropdown-menu">
-                    <div style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--color-border);">
-                        <div style="font-size:0.8rem;font-weight:600;color:var(--color-text-muted);margin-bottom:0.375rem;">Send with code</div>
+                    <div class="px-3 py-2 border-b border-border">
+                        <div class="text-xs font-semibold text-text-muted mb-1.5">Send with code</div>
                         <form hx-post="/receive/send/{{.ID}}"
                               hx-target="#send-result-{{.ID}}"
                               hx-swap="innerHTML"
-                              style="display:flex;gap:0.375rem;align-items:center;">
+                              class="flex gap-1.5 items-center">
                             <input type="text" name="code" placeholder="CODE"
                                    maxlength="4" required
-                                   style="width:5rem;text-transform:uppercase;text-align:center;font-weight:700;font-family:monospace;letter-spacing:0.15rem;padding:0.3rem;">
+                                   class="w-20 uppercase text-center font-bold font-mono tracking-wider p-1">
                             {{if eq .Format "epub"}}
-                            <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.75rem;white-space:nowrap;cursor:pointer;" title="Convert to Kobo KEPUB format">
-                                <input type="checkbox" name="kepubify" value="on" style="width:auto;margin:0;">
+                            <label class="flex items-center gap-1 text-xs whitespace-nowrap cursor-pointer" title="Convert to Kobo KEPUB format">
+                                <input type="checkbox" name="kepubify" value="on" class="w-auto m-0">
                                 KEPUB
                             </label>
                             {{end}}
-                            <button type="submit" class="btn btn-primary btn-sm" style="white-space:nowrap;">Send</button>
+                            <button type="submit" class="btn btn-primary btn-sm whitespace-nowrap">Send</button>
                         </form>
                     </div>
                     {{if $.CurrentUser}}{{if $.CurrentUser.KindleEmail}}{{if $.Config.HasSMTP}}
@@ -143,12 +144,12 @@
                        hx-post="/send/{{.ID}}"
                        hx-target="#send-result-{{.ID}}"
                        hx-swap="innerHTML"
-                       style="display:block;padding:0.5rem 0.75rem;text-decoration:none;color:inherit;font-size:0.85rem;">
+                       class="block px-3 py-2 no-underline text-inherit text-sm">
                         📧 Send to Kindle ({{$.CurrentUser.KindleEmail}})
                     </a>
                     {{end}}{{end}}{{end}}
                     <a href="/receive" target="_blank"
-                       style="display:block;padding:0.5rem 0.75rem;text-decoration:none;color:var(--color-text-muted);font-size:0.8rem;border-top:1px solid var(--color-border);">
+                       class="block px-3 py-2 no-underline text-text-muted text-xs border-t border-border">
                         ℹ️ Open receive page on e-reader
                     </a>
                 </div>
@@ -157,44 +158,40 @@
     </div>
 
     {{/* Row 2: File metadata */}}
-    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.8rem;color:var(--color-text-muted);margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--color-border);">
-        {{if .ISBN}}<span>ISBN: <strong style="color:var(--color-text);">{{.ISBN}}</strong></span>{{end}}
+    <div class="flex gap-6 flex-wrap text-xs text-text-muted mt-2 pt-2 border-t border-border">
+        {{if .ISBN}}<span>ISBN: <strong class="text-text">{{.ISBN}}</strong></span>{{end}}
         {{if .FileSize}}<span>Size: {{formatBytes .FileSize}}</span>{{end}}
         {{if .DurationSeconds}}<span>Duration: {{formatDuration .DurationSeconds}}</span>{{end}}
-        {{if .HasCover}}<span>📷 Has cover</span>{{else}}<span style="opacity:0.6;">No cover</span>{{end}}
+        {{if .HasCover}}<span>📷 Has cover</span>{{else}}<span class="opacity-60">No cover</span>{{end}}
         <span>Added: {{formatDate .CreatedAt}}</span>
         {{if .FileHash}}<span title="{{.FileHash}}">Hash: {{printf "%.12s" .FileHash}}…</span>{{end}}
     </div>
 
     {{/* Row 3: Admin — file path + inline edit */}}
     {{if $.CurrentUser}}{{if $.CurrentUser.IsAdmin}}
-    <div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px dashed var(--color-border);">
-        {{/* File path (admin only) */}}
+    <div class="mt-2 pt-2 border-t border-dashed border-border">
         {{if .FilePath}}
-        <div style="font-size:0.75rem;color:var(--color-text-muted);font-family:monospace;word-break:break-all;margin-bottom:0.5rem;" title="File path">
+        <div class="text-xs text-text-muted font-mono break-all mb-2" title="File path">
             📁 {{.FilePath}}
         </div>
         {{end}}
 
-        {{/* Inline ISBN edit */}}
         <form hx-post="/admin/editions/{{.ID}}"
               hx-target="#edition-status-{{.ID}}"
               hx-swap="innerHTML"
-              style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
-            <label style="font-size:0.8rem;font-weight:500;white-space:nowrap;">ISBN:</label>
+              class="flex gap-2 items-center flex-wrap">
+            <label class="text-xs font-medium whitespace-nowrap">ISBN:</label>
             <input type="text" name="isbn" value="{{.ISBN}}" placeholder="Enter ISBN"
-                   style="width:14rem;font-size:0.8rem;padding:0.25rem 0.4rem;">
-            <label style="font-size:0.8rem;font-weight:500;white-space:nowrap;">Publisher:</label>
+                   class="w-56 text-xs py-1 px-2">
+            <label class="text-xs font-medium whitespace-nowrap">Publisher:</label>
             <input type="text" name="publisher" value="{{.Publisher}}" placeholder="Publisher"
-                   style="width:12rem;font-size:0.8rem;padding:0.25rem 0.4rem;">
+                   class="w-48 text-xs py-1 px-2">
             <button type="submit" class="btn btn-primary btn-sm">Save</button>
             <span id="edition-status-{{.ID}}"></span>
         </form>
 
         {{if .Notes}}
-        <div style="font-size:0.8rem;color:var(--color-text-muted);margin-top:0.375rem;">
-            📝 {{.Notes}}
-        </div>
+        <div class="text-xs text-text-muted mt-1.5">📝 {{.Notes}}</div>
         {{end}}
     </div>
     {{end}}{{end}}
@@ -202,7 +199,7 @@
     <div id="send-result-{{.ID}}"></div>
 </div>
 {{else}}
-<p style="color:var(--color-text-muted);">No editions available.</p>
+<p class="text-text-muted">No editions available.</p>
 {{end}}
 
 <script nonce="{{.Nonce}}">

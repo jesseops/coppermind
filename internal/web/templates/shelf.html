@@ -1,10 +1,10 @@
 {{define "title"}}{{.Shelf.Name}} — Coppermind{{end}}
 {{define "content"}}
 <h1>{{.Shelf.Name}} {{if not .Shelf.IsPublic}}🔒{{end}}</h1>
-{{if .Shelf.Description}}<p style="color:var(--color-text-muted);">{{.Shelf.Description}}</p>{{end}}
+{{if .Shelf.Description}}<p class="text-text-muted">{{.Shelf.Description}}</p>{{end}}
 <div class="works-grid">
     {{range .Works}}
-    <a href="/works/{{.ID}}" class="work-card" style="text-decoration:none;color:inherit;">
+    <a href="/works/{{.ID}}" class="work-card no-underline text-inherit">
         <div class="cover">{{if .HasCover}}<img src="/covers/{{.ID}}" loading="lazy">{{else}}{{coverInitials .Title}}{{end}}</div>
         <div class="title">{{.Title}}</div>
     </a>

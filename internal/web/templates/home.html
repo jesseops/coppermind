@@ -1,8 +1,8 @@
 {{define "title"}}Library — Coppermind{{end}}
 {{define "content"}}
-<div class="page-header">
+<div class="flex justify-between items-center my-4">
     <h1>Library</h1>
-    <span style="color:var(--color-text-muted)">{{.Total}} works</span>
+    <span class="text-text-muted">{{.Total}} works</span>
 </div>
 
 <div class="search-bar">
@@ -29,7 +29,7 @@
 {{define "works_grid"}}
 <div class="works-grid">
     {{range .Works}}
-    <a href="/works/{{.ID}}" class="work-card" style="text-decoration:none;color:inherit;">
+    <a href="/works/{{.ID}}" class="work-card no-underline text-inherit">
         <div class="cover">
             {{if .HasCover}}
                 <img src="/covers/{{.ID}}" alt="{{.Title}}" loading="lazy">
@@ -45,7 +45,7 @@
         </div>
     </a>
     {{else}}
-    <p style="grid-column:1/-1;text-align:center;color:var(--color-text-muted);padding:2rem;">
+    <p class="col-span-full text-center text-text-muted py-8">
         No works found. {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}<a href="/admin/import">Import some books</a>{{end}}{{end}}
     </p>
     {{end}}
@@ -54,7 +54,7 @@
 {{if or .HasPrev .HasNext}}
 <div class="pagination">
     {{if .HasPrev}}<a href="/?page={{.PrevPage}}&q={{.Query}}" class="btn btn-sm">← Previous</a>{{end}}
-    <span style="color:var(--color-text-muted)">Page {{.Page}} of {{.TotalPages}}</span>
+    <span class="text-text-muted">Page {{.Page}} of {{.TotalPages}}</span>
     {{if .HasNext}}<a href="/?page={{.NextPage}}&q={{.Query}}" class="btn btn-sm">Next →</a>{{end}}
 </div>
 {{end}}

@@ -1,15 +1,15 @@
 {{define "title"}}Reading: {{.Work.Title}} — Coppermind{{end}}
 {{define "content"}}
-<div style="margin:1rem 0;">
+<div class="my-4 flex items-center gap-4">
     <a href="/works/{{.Work.ID}}">← {{.Work.Title}}</a>
-    <select onchange="window.location.href='/read/{{.Edition.ID}}?chapter='+this.value" style="margin-left:1rem;width:auto;">
+    <select onchange="window.location.href='/read/{{.Edition.ID}}?chapter='+this.value" class="w-auto">
         {{range .Chapters}}<option value="{{.Index}}" {{if eq .Index $.CurrentCh}}selected{{end}}>{{.Title}}</option>{{end}}
     </select>
 </div>
-<div style="max-width:700px;margin:0 auto;line-height:1.8;font-size:1.1rem;">
+<div class="max-w-[700px] mx-auto leading-relaxed text-lg">
     {{.ChapterHTML}}
 </div>
-<div style="display:flex;justify-content:space-between;margin:2rem 0;">
+<div class="flex justify-between my-8">
     {{if gt .CurrentCh 0}}<a href="/read/{{.Edition.ID}}?chapter={{subtract .CurrentCh 1}}" class="btn btn-sm">← Previous</a>{{end}}
     <span></span>
     <a href="/read/{{.Edition.ID}}?chapter={{add .CurrentCh 1}}" class="btn btn-sm">Next →</a>

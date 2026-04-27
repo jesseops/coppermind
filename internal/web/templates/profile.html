@@ -1,7 +1,7 @@
 {{define "title"}}Profile — Coppermind{{end}}
 {{define "content"}}
 <h1>Profile</h1>
-<form method="POST" action="/me">
+<form method="POST" action="/me" class="max-w-lg">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
     <div class="form-group"><label>Username</label><input type="text" value="{{.User.Username}}" disabled></div>
     <div class="form-group"><label>Display Name</label><input type="text" name="display_name" value="{{.User.DisplayName}}"></div>
@@ -9,5 +9,5 @@
     <div class="form-group"><label>New Password (leave blank to keep current)</label><input type="password" name="new_password"></div>
     <button type="submit" class="btn btn-primary">Save</button>
 </form>
-<p style="margin-top:1rem;color:var(--color-text-muted);">Role: {{.User.Role}}</p>
+<p class="mt-4 text-text-muted text-sm">Role: {{.User.Role}}</p>
 {{end}}

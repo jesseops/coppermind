@@ -18,30 +18,30 @@
 </head>
 <body hx-headers='{"X-CSRF-Token":"{{.CSRFToken}}"}'>
     {{template "nav" .}}
-    <main class="container">
+    <main class="container mx-auto px-4 py-2">
         {{block "content" .}}{{end}}
     </main>
 </body>
 </html>{{end}}
 
 {{define "nav"}}
-<nav>
-    <div class="nav-inner">
-        <div class="nav-links">
-            <a href="/" style="font-weight:700;font-size:1.1rem;">📚 Coppermind</a>
-            <a href="/">Library</a>
-            <a href="/authors">Authors</a>
-            <a href="/series">Series</a>
-            <a href="/receive" title="Send books to your e-reader">📲 Receive</a>
+<nav class="bg-nav-bg border-b border-nav-border px-4 py-3">
+    <div class="max-w-[1200px] mx-auto flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-4 flex-wrap">
+            <a href="/" class="font-bold text-lg no-underline">📚 Coppermind</a>
+            <a href="/" class="font-medium">Library</a>
+            <a href="/authors" class="font-medium">Authors</a>
+            <a href="/series" class="font-medium">Series</a>
+            <a href="/receive" class="font-medium" title="Send books to your e-reader">📲 Receive</a>
         </div>
-        <div class="nav-links">
+        <div class="flex items-center gap-4 flex-wrap">
             {{if .CurrentUser}}
-                <a href="/me/reading">Reading</a>
-                {{if .CurrentUser.IsAdmin}}<a href="/admin/import">Import</a>{{end}}
-                <a href="/me">{{.CurrentUser.DisplayName}}</a>
-                <a href="/logout">Logout</a>
+                <a href="/me/reading" class="font-medium">Reading</a>
+                {{if .CurrentUser.IsAdmin}}<a href="/admin/import" class="font-medium">Import</a>{{end}}
+                <a href="/me" class="font-medium">{{.CurrentUser.DisplayName}}</a>
+                <a href="/logout" class="font-medium">Logout</a>
             {{else}}
-                <a href="/login">Login</a>
+                <a href="/login" class="font-medium">Login</a>
             {{end}}
             <div class="theme-picker" id="theme-picker">
                 <button class="theme-picker-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Change theme">
@@ -49,15 +49,15 @@
                 </button>
                 <div class="theme-picker-menu">
                     <button class="theme-option" onclick="setTheme('auto')" data-theme-value="auto">
-                        <span class="theme-swatch" style="background:linear-gradient(135deg,#EFEFE9 50%,#1A1D20 50%);"></span>
+                        <span class="theme-swatch bg-gradient-to-br from-[#EFEFE9] to-[#1A1D20]"></span>
                         Auto
                     </button>
                     <button class="theme-option" onclick="setTheme('archives')" data-theme-value="archives">
-                        <span class="theme-swatch" style="background:#EFEFE9;border-color:#D4AF37;"></span>
+                        <span class="theme-swatch bg-[#EFEFE9] border-[#D4AF37]"></span>
                         Archives
                     </button>
                     <button class="theme-option" onclick="setTheme('vault')" data-theme-value="vault">
-                        <span class="theme-swatch" style="background:#1A1D20;border-color:#B87333;"></span>
+                        <span class="theme-swatch bg-[#1A1D20] border-[#B87333]"></span>
                         Vault
                     </button>
                 </div>

@@ -2,25 +2,25 @@
 {{define "content"}}
 {{if .IsEReader}}
 {{/* ── E-Reader view: show code and poll for downloads ── */}}
-<div style="text-align:center;padding:2rem 0;">
-    <h1 style="margin-bottom:0.5rem;">Send to {{.DeviceType}}</h1>
-    <p style="color:var(--color-text-muted);margin-bottom:2rem;">Enter this code on another device to send a book here.</p>
+<div class="text-center py-8">
+    <h1 class="mb-2">Send to {{.DeviceType}}</h1>
+    <p class="text-text-muted mb-8">Enter this code on another device to send a book here.</p>
 
-    <div style="font-size:0.9rem;color:var(--color-text-muted);margin-bottom:0.5rem;">Your code:</div>
-    <div id="keycode" style="font-size:4rem;font-weight:800;letter-spacing:0.5rem;font-family:monospace;padding:1rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:0.75rem;display:inline-block;min-width:200px;">
+    <div class="text-sm text-text-muted mb-2">Your code:</div>
+    <div id="keycode" class="text-6xl font-extrabold tracking-[0.5rem] font-mono p-4 bg-surface border border-border rounded-xl inline-block min-w-[200px]">
         ····
     </div>
 
-    <div style="margin-top:0.5rem;">
+    <div class="mt-2">
         <button id="keygen-btn" class="btn btn-sm btn-surface" onclick="generateKey()">↻ New code</button>
     </div>
 
-    <div id="download-area" style="display:none;margin-top:2rem;padding:1.5rem;background:var(--color-surface);border:1px solid var(--color-border);border-radius:0.75rem;">
-        <div style="font-size:1.1rem;margin-bottom:0.75rem;">📥 <strong>Download ready!</strong></div>
-        <a id="download-link" href="#" class="btn btn-primary" style="font-size:1.1rem;padding:0.75rem 2rem;">Download</a>
+    <div id="download-area" class="hidden mt-8 p-6 bg-surface border border-border rounded-xl">
+        <div class="text-lg mb-3">📥 <strong>Download ready!</strong></div>
+        <a id="download-link" href="#" class="btn btn-primary text-lg px-8 py-3">Download</a>
     </div>
 
-    <div id="status-msg" style="margin-top:1rem;color:var(--color-text-muted);font-size:0.85rem;">
+    <div id="status-msg" class="mt-4 text-text-muted text-sm">
         Waiting for a book to be sent...
     </div>
 </div>
@@ -32,7 +32,7 @@ var pollTimer = null;
 function generateKey() {
     if (pollTimer) clearInterval(pollTimer);
     document.getElementById('keycode').textContent = '····';
-    document.getElementById('download-area').style.display = 'none';
+    document.getElementById('download-area').classList.add('hidden');
     document.getElementById('status-msg').textContent = 'Generating code...';
 
     var x = new XMLHttpRequest();
@@ -63,7 +63,7 @@ function pollStatus() {
             currentKey = null;
             if (pollTimer) clearInterval(pollTimer);
             document.getElementById('keycode').textContent = '····';
-            document.getElementById('download-area').style.display = 'none';
+            document.getElementById('download-area').classList.add('hidden');
             document.getElementById('status-msg').textContent = 'Code expired. Generating new one...';
             setTimeout(generateKey, 1000);
             return;
@@ -72,12 +72,12 @@ function pollStatus() {
         try {
             var data = JSON.parse(x.responseText);
             if (data.file) {
-                document.getElementById('download-area').style.display = 'block';
+                document.getElementById('download-area').classList.remove('hidden');
                 document.getElementById('download-link').textContent = '📖 ' + data.file.name;
                 document.getElementById('download-link').href = '/receive/download/' + currentKey + '/' + encodeURIComponent(data.file.name);
                 document.getElementById('status-msg').textContent = 'Tap the button above to download.';
             } else {
-                document.getElementById('download-area').style.display = 'none';
+                document.getElementById('download-area').classList.add('hidden');
                 document.getElementById('status-msg').textContent = 'Waiting for a book to be sent...';
             }
         } catch(e) {}
@@ -90,26 +90,26 @@ generateKey();
 
 {{else}}
 {{/* ── Normal browser: show instructions ── */}}
-<div style="max-width:600px;margin:2rem auto;text-align:center;">
+<div class="max-w-xl mx-auto mt-8 text-center">
     <h1>Send to E-Reader</h1>
-    <p style="color:var(--color-text-muted);margin:1rem 0;">
+    <p class="text-text-muted my-4">
         Open this page on your <strong>Kobo</strong>, <strong>Kindle</strong>, or <strong>Tolino</strong> e-reader's built-in web browser.
         A unique code will appear. Then use the <em>"Send with code"</em> option on any book to transfer it wirelessly.
     </p>
 
-    <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:0.75rem;padding:1.5rem;margin:2rem 0;text-align:left;">
-        <h3 style="margin-top:0;">How it works</h3>
-        <ol style="padding-left:1.5rem;line-height:2;">
+    <div class="bg-surface border border-border rounded-xl p-6 my-8 text-left">
+        <h3 class="mt-0">How it works</h3>
+        <ol class="pl-6 leading-loose">
             <li>On your e-reader, open the web browser</li>
             <li>Navigate to <strong id="receive-url"></strong></li>
-            <li>A 4-character code will appear (e.g., <code style="font-size:1.1em;font-weight:700;color:var(--color-primary);">A3KR</code>)</li>
+            <li>A 4-character code will appear (e.g., <code class="text-lg font-bold text-primary">A3KR</code>)</li>
             <li>On this device, find a book and click <em>"Send via… → Send with code"</em></li>
             <li>Enter the code and click Send</li>
             <li>The book will appear as a download on your e-reader</li>
         </ol>
     </div>
 
-    <p style="color:var(--color-text-muted);font-size:0.85rem;">
+    <p class="text-text-muted text-sm">
         For Kobo devices, EPUB files can be automatically converted to Kobo's optimized KEPUB format.
         Files are stored temporarily and deleted shortly after the e-reader disconnects.
     </p>

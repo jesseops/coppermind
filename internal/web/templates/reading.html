@@ -7,11 +7,11 @@
     <div class="work-card">
         <div class="cover">{{if .CoverPath}}<img src="/covers/{{.WorkID}}" loading="lazy">{{else}}{{coverInitials .WorkTitle}}{{end}}</div>
         <div class="title">{{.WorkTitle}}</div>
-        <div style="background:var(--color-border);border-radius:9999px;height:4px;margin-top:0.5rem;">
-            <div style="background:var(--color-primary);border-radius:9999px;height:100%;width:{{multiply .Progress 100}}%;"></div>
+        <div class="bg-border rounded-full h-1 mt-2">
+            <div class="bg-primary rounded-full h-full" style="width:{{multiply .Progress 100}}%;"></div>
         </div>
     </div>
     {{end}}
 </div>
-{{else}}<p style="color:var(--color-text-muted);margin-top:1rem;">Not reading anything right now.</p>{{end}}
+{{else}}<p class="text-text-muted mt-4">Not reading anything right now.</p>{{end}}
 {{end}}
