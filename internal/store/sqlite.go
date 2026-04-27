@@ -14,6 +14,8 @@ type SQLiteStore struct {
 	db *sqlx.DB
 }
 
+var _ Store = (*SQLiteStore)(nil)
+
 // NewSQLiteStore opens (or creates) a SQLite database and runs migrations.
 func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 	// Ensure parent directory exists.

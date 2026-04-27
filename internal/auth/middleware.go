@@ -26,7 +26,7 @@ func SetUserInContext(ctx context.Context, user *domain.User) context.Context {
 // OptionalAuth is middleware that loads the user from the session cookie if present.
 // Also supports HTTP Basic Auth for API/OPDS clients.
 // Requests continue even without authentication.
-func OptionalAuth(s store.Store, secret []byte) func(http.Handler) http.Handler {
+func OptionalAuth(s store.UserStore, secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Try session cookie first.
@@ -62,7 +62,7 @@ func OptionalAuth(s store.Store, secret []byte) func(http.Handler) http.Handler 
 
 // RequireAuth is middleware that requires an authenticated user.
 // Returns 401 if not authenticated.
-func RequireAuth(s store.Store, secret []byte) func(http.Handler) http.Handler {
+func RequireAuth(s store.UserStore, secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := UserFromContext(r.Context())
@@ -91,7 +91,7 @@ func RequireAuth(s store.Store, secret []byte) func(http.Handler) http.Handler {
 }
 
 // RequireAdmin is middleware that requires an admin user.
-func RequireAdmin(s store.Store, secret []byte) func(http.Handler) http.Handler {
+func RequireAdmin(s store.UserStore, secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := UserFromContext(r.Context())
