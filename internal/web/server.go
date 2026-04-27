@@ -298,7 +298,7 @@ func (s *Server) buildRouter() chi.Router {
 func (s *Server) setupCheckMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip for setup and static routes.
-		if strings.HasPrefix(r.URL.Path, "/setup") || strings.HasPrefix(r.URL.Path, "/static") {
+		if strings.HasPrefix(r.URL.Path, "/setup") || strings.HasPrefix(r.URL.Path, "/static") || r.URL.Path == "/health" {
 			next.ServeHTTP(w, r)
 			return
 		}
