@@ -51,7 +51,7 @@ type CoverSearchResult struct {
 	ThumbURL  string `json:"thumb_url"`
 }
 
-var httpClient = &http.Client{Timeout: 10 * time.Second}
+var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // searchOpenLibrary queries Open Library for cover art.
 func searchOpenLibrary(query, author, isbn string) ([]CoverSearchResult, error) {
