@@ -30,7 +30,7 @@
     </div>
 
     {{/* ── Main content ── */}}
-    <div class="flex-1 min-w-0">
+    <div class="flex-1 min-w-0" x-data="{ selected: [], get allChecked() { return this.selected.length === {{len .Works}} && this.selected.length > 0 } }">
         <div class="flex items-center gap-3 mb-4 flex-wrap">
             <h2 class="mt-0 mb-0">
                 {{if eq .Issue ""}}All Issues
@@ -44,10 +44,33 @@
         </div>
 
         {{if .Works}}
+        {{/* ── Bulk action bar ── */}}
+        <div class="flex items-center gap-2 mb-3 p-2 bg-surface border border-border rounded-md text-sm" x-show="selected.length > 0" x-cloak>
+            <span class="text-text-muted" x-text="selected.length + ' selected'"></span>
+            <form method="POST" action="/admin/librarian/bulk" class="flex gap-2 items-center">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                <template x-for="id in selected" :key="id">
+                    <input type="hidden" name="work_id" x-bind:value="id">
+                </template>
+                <button type="submit" name="action" value="reparse" class="btn btn-surface btn-sm text-xs">🔄 Reparse selected</button>
+                {{if eq .Issue "hidden"}}
+                <button type="submit" name="action" value="unhide" class="btn btn-surface btn-sm text-xs">👁️ Unhide selected</button>
+                {{else}}
+                <button type="submit" name="action" value="hide" class="btn btn-surface btn-sm text-xs">🙈 Hide selected</button>
+                {{end}}
+            </form>
+            <button class="btn btn-surface btn-sm text-xs ml-auto" x-on:click="selected = []">✕ Clear</button>
+        </div>
+
         <div class="overflow-x-auto">
         <table class="text-sm w-full">
             <thead>
                 <tr>
+                    <th class="w-8 text-center">
+                        <input type="checkbox" class="w-auto m-0"
+                               x-on:change="selected = $el.checked ? [{{range $i, $w := .Works}}{{if $i}},{{end}}{{$w.ID}}{{end}}] : []"
+                               x-bind:checked="allChecked">
+                    </th>
                     <th class="w-10"></th>
                     <th class="text-left">Title</th>
                     <th class="text-left">Author</th>
@@ -59,6 +82,11 @@
             <tbody>
                 {{range .Works}}
                 <tr class="hover:bg-surface-hover transition {{if .Hidden}}opacity-50{{end}}">
+                    <td class="py-1 text-center">
+                        <input type="checkbox" class="w-auto m-0" value="{{.ID}}"
+                               x-on:change="$el.checked ? selected.push({{.ID}}) : (selected = selected.filter(id => id !== {{.ID}}))"
+                               x-bind:checked="selected.includes({{.ID}})">
+                    </td>
                     <td class="py-1">
                         {{if .HasCover}}<img src="/covers/{{.ID}}?v={{.UpdatedAt.Unix}}" class="w-8 h-10 object-cover rounded" loading="lazy">
                         {{else}}<div class="w-8 h-10 bg-surface rounded flex items-center justify-center text-xs text-text-muted">—</div>{{end}}

@@ -770,6 +770,107 @@ func (s *Server) handleAdminToggleHide(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
 }
 
+func (s *Server) handleAdminLibrarianBulk(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	action := r.FormValue("action")
+	ids := r.Form["work_id"]
+
+	if len(ids) == 0 {
+		http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
+		return
+	}
+
+	var workIDs []int64
+	for _, raw := range ids {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err == nil && id > 0 {
+			workIDs = append(workIDs, id)
+		}
+	}
+
+	switch action {
+	case "reparse":
+		for _, workID := range workIDs {
+			s.reparseWork(workID)
+		}
+	case "hide":
+		hidden := true
+		for _, workID := range workIDs {
+			s.store.UpdateWork(workID, store.WorkUpdate{Hidden: &hidden})
+		}
+	case "unhide":
+		hidden := false
+		for _, workID := range workIDs {
+			s.store.UpdateWork(workID, store.WorkUpdate{Hidden: &hidden})
+		}
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Refresh", "true")
+		return
+	}
+	http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
+}
+
+// reparseWork re-extracts metadata from the first edition's source file
+// and updates the work's title, authors, description, and language.
+func (s *Server) reparseWork(workID int64) {
+	work, err := s.store.GetWork(workID)
+	if err != nil {
+		return
+	}
+	editions, err := s.store.ListEditions(workID)
+	if err != nil || len(editions) == 0 {
+		return
+	}
+	ed := editions[0]
+	if ed.FilePath == "" {
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(ed.FilePath))
+	var meta *importer.Extracted
+	switch ext {
+	case ".epub":
+		meta, err = importer.ExtractEpubMetadata(ed.FilePath)
+	case ".mobi":
+		meta, err = importer.ExtractMobiMetadata(ed.FilePath)
+	default:
+		return
+	}
+	if err != nil || meta == nil {
+		return
+	}
+
+	if meta.Title != "" && meta.Title != work.Title {
+		s.store.UpdateWork(workID, store.WorkUpdate{Title: &meta.Title})
+	}
+	if len(meta.Authors) > 0 && reparseAuthorsChanged(work, meta.Authors) {
+		oldAuthors, _ := s.store.GetWorkAuthors(workID)
+		for _, oa := range oldAuthors {
+			s.store.UnlinkWorkAuthor(workID, oa.AuthorID, oa.Role)
+		}
+		for _, name := range meta.Authors {
+			sortName := domain.GenerateSortName(name)
+			existing, _ := s.store.FindAuthorBySortName(sortName)
+			if existing != nil {
+				s.store.LinkWorkAuthor(workID, existing.ID, domain.RoleAuthorOf)
+			} else {
+				created, err := s.store.CreateAuthor(name, sortName)
+				if err == nil {
+					s.store.LinkWorkAuthor(workID, created.ID, domain.RoleAuthorOf)
+				}
+			}
+		}
+	}
+	if meta.Description != "" && work.Description == "" {
+		s.store.UpdateWork(workID, store.WorkUpdate{Description: &meta.Description})
+	}
+	if meta.Language != "" && work.Language == "" {
+		s.store.UpdateWork(workID, store.WorkUpdate{Language: &meta.Language})
+	}
+}
+
 // rewriteEpubAssetURLs rewrites relative src/href attributes in EPUB chapter
 // HTML to point to the /epub-asset/{editionID}/... endpoint.
 func rewriteEpubAssetURLs(html string, editionID int64, chapterPath string) string {
