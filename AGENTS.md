@@ -48,10 +48,13 @@ is persisted.
 ## Theming
 
 Themes are pure CSS via `[data-theme="<name>"]` on `<html>`. All components reference
-CSS custom properties (`--color-primary`, `--color-bg`, etc.) defined per-theme.
-Five themes are available: `auto` (follows system), `light`, `vault` (dark/copper),
-`archives` (parchment/serif), `blueprint` (forest/schematic). Theme selection is stored
-in `localStorage('coppermind-theme')` and applied before first paint to prevent flash.
+CSS custom properties — there are zero theme-specific component selectors. Everything
+from colors to fonts to shadows is driven by `--theme-*` variables.
+
+Three choices: `auto` (archives for light system pref, vault for dark), `archives`
+(parchment/serif light), `vault` (dark/copper/monospace). Theme selection is stored
+in `localStorage('coppermind-theme')` and applied before first paint.
+
 To add a theme: define a new `[data-theme="<name>"]` block in `input.css` with all
 `--theme-*` variables, add a button to the picker in `base.html`, and run `make css`.
 

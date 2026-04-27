@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="/static/css/app.css">
     <script src="/static/js/htmx.min.js"></script>
     <script>
-    // Theme management — apply saved theme before paint.
     (function() {
         var t = localStorage.getItem('coppermind-theme') || 'auto';
         document.documentElement.setAttribute('data-theme', t);
@@ -43,28 +42,20 @@
             {{end}}
             <div class="theme-picker" id="theme-picker">
                 <button class="theme-picker-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Change theme">
-                    🎨 Theme
+                    🎨
                 </button>
                 <div class="theme-picker-menu">
                     <button class="theme-option" onclick="setTheme('auto')" data-theme-value="auto">
-                        <span class="theme-swatch" style="background:linear-gradient(135deg,#fff 50%,#1A1D20 50%);"></span>
-                        Auto (system)
-                    </button>
-                    <button class="theme-option" onclick="setTheme('light')" data-theme-value="light">
-                        <span class="theme-swatch" style="background:#ffffff;"></span>
-                        Light
-                    </button>
-                    <button class="theme-option" onclick="setTheme('vault')" data-theme-value="vault">
-                        <span class="theme-swatch" style="background:#1A1D20;border-color:#B87333;"></span>
-                        Vault
+                        <span class="theme-swatch" style="background:linear-gradient(135deg,#EFEFE9 50%,#1A1D20 50%);"></span>
+                        Auto
                     </button>
                     <button class="theme-option" onclick="setTheme('archives')" data-theme-value="archives">
                         <span class="theme-swatch" style="background:#EFEFE9;border-color:#D4AF37;"></span>
                         Archives
                     </button>
-                    <button class="theme-option" onclick="setTheme('blueprint')" data-theme-value="blueprint">
-                        <span class="theme-swatch" style="background:#0F2B0F;border-color:#B87333;"></span>
-                        Blueprint
+                    <button class="theme-option" onclick="setTheme('vault')" data-theme-value="vault">
+                        <span class="theme-swatch" style="background:#1A1D20;border-color:#B87333;"></span>
+                        Vault
                     </button>
                 </div>
             </div>
