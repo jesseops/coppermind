@@ -216,6 +216,12 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 	if filter.MissingDesc {
 		where = append(where, "(w.description IS NULL OR w.description = '')")
 	}
+	if filter.Format != "" {
+		where = append(where, `EXISTS (
+			SELECT 1 FROM editions e2 WHERE e2.work_id = w.id AND e2.format = ? AND e2.status = 'active'
+		)`)
+		args = append(args, filter.Format)
+	}
 
 	whereClause := strings.Join(where, " AND ")
 

@@ -105,6 +105,7 @@ type WorkFilter struct {
 	MissingCover  bool   // if true, only return works without covers
 	MissingAuthor bool   // if true, only return works with no authors
 	MissingDesc   bool   // if true, only return works with no description
+	Format        string // edition format: "epub", "mobi", "pdf", etc.
 }
 
 // WorkUpdate specifies partial updates to a work.

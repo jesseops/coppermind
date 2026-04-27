@@ -685,10 +685,12 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 
 	issue := r.URL.Query().Get("issue")
 	q := r.URL.Query().Get("q")
+	format := r.URL.Query().Get("format")
 
 	filter := store.WorkFilter{
 		LibraryID: libs[0].ID,
 		Query:     q,
+		Format:    format,
 		SortBy:    "title",
 	}
 
@@ -723,8 +725,8 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 		total = len(filtered)
 	}
 
-	// Count per issue for the sidebar.
-	allWorks, _, _ := s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, IncludeHidden: true})
+	// Count per issue for the sidebar (respecting format filter).
+	allWorks, _, _ := s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, IncludeHidden: true, Format: format})
 	counts := map[string]int{}
 	for _, w := range allWorks {
 		if !w.HasCover() {
@@ -746,6 +748,7 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 		"Total":  total,
 		"Issue":  issue,
 		"Query":  q,
+		"Format": format,
 		"Counts": counts,
 	}
 

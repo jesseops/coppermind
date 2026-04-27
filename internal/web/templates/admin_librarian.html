@@ -7,22 +7,22 @@
         <h2 class="text-base mt-0 mb-3">📋 Librarian</h2>
         <nav class="flex flex-col gap-1">
             {{$issue := .Issue}}
-            <a href="/admin/librarian" class="btn btn-sm {{if eq $issue ""}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
+            <a href="/admin/librarian?format={{$.Format}}" class="btn btn-sm {{if eq $issue ""}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
                 🔍 All issues
             </a>
-            <a href="/admin/librarian?issue=no-cover" class="btn btn-sm {{if eq $issue "no-cover"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
+            <a href="/admin/librarian?issue=no-cover&format={{$.Format}}" class="btn btn-sm {{if eq $issue "no-cover"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
                 🖼️ Missing cover
                 {{with index .Counts "no-cover"}}<span class="ml-auto badge bg-error text-white text-xs">{{.}}</span>{{end}}
             </a>
-            <a href="/admin/librarian?issue=no-author" class="btn btn-sm {{if eq $issue "no-author"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
+            <a href="/admin/librarian?issue=no-author&format={{$.Format}}" class="btn btn-sm {{if eq $issue "no-author"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
                 👤 Missing author
                 {{with index .Counts "no-author"}}<span class="ml-auto badge bg-error text-white text-xs">{{.}}</span>{{end}}
             </a>
-            <a href="/admin/librarian?issue=no-description" class="btn btn-sm {{if eq $issue "no-description"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
+            <a href="/admin/librarian?issue=no-description&format={{$.Format}}" class="btn btn-sm {{if eq $issue "no-description"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
                 📝 Missing description
                 {{with index .Counts "no-description"}}<span class="ml-auto badge bg-error text-white text-xs">{{.}}</span>{{end}}
             </a>
-            <a href="/admin/librarian?issue=hidden" class="btn btn-sm {{if eq $issue "hidden"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
+            <a href="/admin/librarian?issue=hidden&format={{$.Format}}" class="btn btn-sm {{if eq $issue "hidden"}}btn-primary{{else}}btn-surface{{end}} text-left justify-start">
                 👁️‍🗨️ Hidden works
                 {{with index .Counts "hidden"}}<span class="ml-auto badge bg-surface text-text-muted text-xs">{{.}}</span>{{end}}
             </a>
@@ -41,6 +41,14 @@
                 {{end}}
             </h2>
             <span class="text-text-muted text-sm">{{.Total}} works</span>
+            <select x-data x-on:change="window.location.href='/admin/librarian?issue={{.Issue}}&format='+$el.value" class="w-auto text-sm ml-auto">
+                <option value="" {{if eq .Format ""}}selected{{end}}>All formats</option>
+                <option value="epub" {{if eq .Format "epub"}}selected{{end}}>EPUB</option>
+                <option value="mobi" {{if eq .Format "mobi"}}selected{{end}}>MOBI</option>
+                <option value="pdf" {{if eq .Format "pdf"}}selected{{end}}>PDF</option>
+                <option value="mp3" {{if eq .Format "mp3"}}selected{{end}}>MP3</option>
+                <option value="m4b" {{if eq .Format "m4b"}}selected{{end}}>M4B</option>
+            </select>
         </div>
 
         {{if .Works}}
