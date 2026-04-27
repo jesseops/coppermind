@@ -1,7 +1,11 @@
 {{define "title"}}{{.Shelf.Name}} — Coppermind{{end}}
 {{define "content"}}
-<h1>{{.Shelf.Name}} {{if not .Shelf.IsPublic}}🔒{{end}}</h1>
-{{if .Shelf.Description}}<p class="text-text-muted">{{.Shelf.Description}}</p>{{end}}
+<div class="flex items-center justify-between my-4">
+    <h1>{{.Shelf.Name}} {{if not .Shelf.IsPublic}}🔒{{end}}</h1>
+    <a href="/me/shelves" class="btn btn-surface btn-sm">← All Shelves</a>
+</div>
+{{if .Shelf.Description}}<p class="text-text-muted mb-4">{{.Shelf.Description}}</p>{{end}}
+{{if .Works}}
 <div class="works-grid">
     {{range .Works}}
     <a href="/works/{{.ID}}" class="work-card no-underline text-inherit">
@@ -10,4 +14,5 @@
     </a>
     {{end}}
 </div>
+{{else}}<p class="text-text-muted mt-4">This shelf is empty. Add books from the library using the action menu on any book card.</p>{{end}}
 {{end}}

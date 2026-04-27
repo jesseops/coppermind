@@ -2,11 +2,15 @@
 {{define "content"}}
 <h1>My Shelves</h1>
 {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+{{if .Shelves}}
 {{range .Shelves}}
-<a href="/shelves/{{.ID}}" class="flex justify-between p-3 border border-border rounded-md mt-2 no-underline text-inherit hover:border-primary transition">
+<a href="/?shelf={{.ID}}" class="flex justify-between p-3 border border-border rounded-md mt-2 no-underline text-inherit hover:border-primary transition">
     <span>{{.Name}} {{if not .IsPublic}}🔒{{end}}</span>
     <span class="text-text-muted">{{.WorkCount}} works</span>
 </a>
+{{end}}
+{{else}}
+<p class="text-text-muted mt-4 mb-4">You haven't created any shelves yet. Shelves let you organize your library into custom collections.</p>
 {{end}}
 <h2 class="mt-8">Create Shelf</h2>
 <form method="POST" action="/me/shelves" class="max-w-lg">

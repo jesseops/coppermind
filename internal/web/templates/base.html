@@ -34,17 +34,39 @@
             <a href="/?group=series" class="font-medium">By Series</a>
             {{if .CurrentUser}}
             <a href="/me/shelves" class="font-medium">Shelves</a>
+            <a href="/me/reading" class="font-medium">Reading</a>
             {{end}}
-            <a href="/receive" class="font-medium" title="Send books to your e-reader">📲 Receive</a>
+            <a href="/receive" class="font-medium" title="Send books to your e-reader">📲</a>
         </div>
-        <div class="flex items-center gap-4 flex-wrap">
+        <div class="flex items-center gap-3 flex-wrap">
             {{if .CurrentUser}}
-                <a href="/me/reading" class="font-medium">Reading</a>
-                {{if .CurrentUser.IsAdmin}}<a href="/admin/import" class="font-medium">Import</a>{{end}}
-                <a href="/me" class="font-medium">{{.CurrentUser.DisplayName}}</a>
-                <a href="/logout" class="font-medium">Logout</a>
+                {{if .CurrentUser.IsAdmin}}
+                {{/* Admin dropdown */}}
+                <div class="theme-picker" id="admin-menu">
+                    <button class="theme-picker-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Admin">
+                        ⚙️
+                    </button>
+                    <div class="theme-picker-menu">
+                        <a href="/admin/import" class="theme-option">📥 Import books</a>
+                        <a href="/admin/users" class="theme-option">👥 Manage users</a>
+                        <a href="/admin/duplicates" class="theme-option">🔍 Duplicates</a>
+                    </div>
+                </div>
+                {{end}}
+                {{/* User dropdown */}}
+                <div class="theme-picker" id="user-menu">
+                    <button class="theme-picker-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Account">
+                        {{.CurrentUser.DisplayName}}
+                    </button>
+                    <div class="theme-picker-menu">
+                        <a href="/me" class="theme-option">👤 Profile</a>
+                        <a href="/me/shelves" class="theme-option">📚 My Shelves</a>
+                        <a href="/me/reading" class="theme-option">📖 Reading</a>
+                        <a href="/logout" class="theme-option">🚪 Logout</a>
+                    </div>
+                </div>
             {{else}}
-                <a href="/login" class="font-medium">Login</a>
+                <a href="/login" class="btn btn-surface btn-sm">Login</a>
             {{end}}
             <div class="theme-picker" id="theme-picker">
                 <button class="theme-picker-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Change theme">
