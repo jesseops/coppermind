@@ -40,6 +40,7 @@ type Server struct {
 	pages    map[string]*template.Template // per-page templates (each includes base)
 	secret   []byte
 	router   chi.Router
+	sends    *sendStore // in-memory key store for send-to-ereader
 }
 
 // NewServer creates a new web server.
@@ -49,6 +50,7 @@ func NewServer(s store.Store, cfg *config.Config) (*Server, error) {
 		importer: importer.NewImporter(s, cfg.DataDir),
 		config:   cfg,
 		secret:   cfg.SessionSecretBytes(),
+		sends:    newSendStore(),
 	}
 
 	// Parse templates — each page gets its own clone of the base template
@@ -174,66 +176,75 @@ func (s *Server) buildRouter() chi.Router {
 	r.Use(requestLogger)
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders)
-	r.Use(auth.CSRFProtect)
 	r.Use(gzipMiddleware)
 	r.Use(auth.OptionalAuth(s.store, s.secret))
 	r.Use(s.setupCheckMiddleware)
 
-	// Static files.
+	// Static files (no CSRF needed).
 	staticRoot, _ := fs.Sub(staticFS, "static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticRoot))))
 
-	// Public routes.
-	r.Get("/", s.handleHome)
-	r.Get("/works/{id}", s.handleWorkDetail)
-	r.Get("/authors", s.handleAuthors)
-	r.Get("/authors/{id}", s.handleAuthorDetail)
-	r.Get("/series", s.handleSeriesList)
-	r.Get("/series/{id}", s.handleSeriesDetail)
-	r.Get("/covers/{id}", s.handleCover)
-	r.Get("/download/{id}", s.handleDownload)
-
-	// Auth routes.
-	r.Get("/login", s.handleLoginForm)
-	r.Post("/login", s.handleLoginSubmit)
-	r.Get("/logout", s.handleLogout)
-	r.Get("/setup", s.handleSetupForm)
-	r.Post("/setup", s.handleSetupSubmit)
-
-	// Reader/player (require auth or guest).
-	r.Get("/read/{id}", s.handleReader)
-	r.Get("/listen/{id}", s.handlePlayer)
-	r.Get("/epub-asset/{id}/*", s.handleEpubAsset)
-	r.Get("/audio/{id}", s.handleAudioTrack)
-
-	// User routes (require auth).
-	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAuth(s.store, s.secret))
-		r.Get("/me", s.handleProfile)
-		r.Get("/me/reading", s.handleCurrentlyReading)
-		r.Post("/api/v1/me/reading/{id}", s.handleSaveReadingState)
-	})
-
-	// JSON API.
+	// ── Routes exempt from CSRF (e-reader API, JSON API, OPDS) ──────
+	r.Post("/receive/generate", s.handleReceiveGenerate)
+	r.Get("/receive/status/{key}", s.handleReceiveStatus)
+	r.Get("/receive/download/{key}/{filename}", s.handleReceiveDownload)
 	s.registerAPIRoutes(r)
-
-	// OPDS catalog.
 	s.registerOPDSRoutes(r)
 
-	// User routes (shelves, ratings, profile).
-	s.registerUserRoutes(r)
-
-	// Admin routes.
+	// ── All other routes with CSRF protection ───────────────────────
 	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAdmin(s.store, s.secret))
-		r.Get("/admin/import", s.handleAdminImportForm)
-		r.Post("/admin/import", s.handleAdminImportSubmit)
-		r.Get("/admin/works/{id}/edit", s.handleAdminEditForm)
-		r.Post("/admin/works/{id}", s.handleAdminEditSubmit)
-		r.Post("/admin/works/{id}/delete", s.handleAdminDeleteWork)
-		r.Get("/admin/users", s.handleAdminUsers)
-		r.Post("/admin/users", s.handleAdminCreateUser)
-		r.Get("/admin/duplicates", s.handleAdminDuplicates)
+		r.Use(auth.CSRFProtect)
+
+		// Public routes.
+		r.Get("/", s.handleHome)
+		r.Get("/works/{id}", s.handleWorkDetail)
+		r.Get("/authors", s.handleAuthors)
+		r.Get("/authors/{id}", s.handleAuthorDetail)
+		r.Get("/series", s.handleSeriesList)
+		r.Get("/series/{id}", s.handleSeriesDetail)
+		r.Get("/covers/{id}", s.handleCover)
+		r.Get("/download/{id}", s.handleDownload)
+		r.Get("/receive", s.handleReceivePage)
+
+		// Auth routes.
+		r.Get("/login", s.handleLoginForm)
+		r.Post("/login", s.handleLoginSubmit)
+		r.Get("/logout", s.handleLogout)
+		r.Get("/setup", s.handleSetupForm)
+		r.Post("/setup", s.handleSetupSubmit)
+
+		// Reader/player.
+		r.Get("/read/{id}", s.handleReader)
+		r.Get("/listen/{id}", s.handlePlayer)
+		r.Get("/epub-asset/{id}/*", s.handleEpubAsset)
+		r.Get("/audio/{id}", s.handleAudioTrack)
+
+		// Send with code (uses CSRF since it's from the main UI).
+		r.Post("/receive/send/{edition_id}", s.handleSendWithCode)
+
+		// User routes (require auth).
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAuth(s.store, s.secret))
+			r.Get("/me", s.handleProfile)
+			r.Get("/me/reading", s.handleCurrentlyReading)
+			r.Post("/api/v1/me/reading/{id}", s.handleSaveReadingState)
+		})
+
+		// User routes (shelves, ratings, profile).
+		s.registerUserRoutes(r)
+
+		// Admin routes.
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAdmin(s.store, s.secret))
+			r.Get("/admin/import", s.handleAdminImportForm)
+			r.Post("/admin/import", s.handleAdminImportSubmit)
+			r.Get("/admin/works/{id}/edit", s.handleAdminEditForm)
+			r.Post("/admin/works/{id}", s.handleAdminEditSubmit)
+			r.Post("/admin/works/{id}/delete", s.handleAdminDeleteWork)
+			r.Get("/admin/users", s.handleAdminUsers)
+			r.Post("/admin/users", s.handleAdminCreateUser)
+			r.Get("/admin/duplicates", s.handleAdminDuplicates)
+		})
 	})
 
 	return r

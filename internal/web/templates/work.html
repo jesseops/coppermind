@@ -41,26 +41,94 @@
 
 <h2 style="margin-top:2rem;">Editions</h2>
 {{range .Editions}}
-<div style="display:flex;align-items:center;gap:1rem;padding:0.75rem;border:1px solid var(--color-border);border-radius:0.375rem;margin-top:0.5rem;">
+<div class="edition-card" style="display:flex;align-items:center;gap:1rem;padding:0.75rem;border:1px solid var(--color-border);border-radius:0.375rem;margin-top:0.5rem;flex-wrap:wrap;">
     <div>
         {{if eq .EditionType "ebook"}}<span class="badge badge-ebook">{{.Format}}</span>
         {{else}}<span class="badge badge-audiobook">{{.Format}}</span>{{end}}
     </div>
-    <div style="flex:1;">
+    <div style="flex:1;min-width:150px;">
         {{if .Publisher}}{{.Publisher}}{{end}}
         {{if .ISBN}} · ISBN: {{.ISBN}}{{end}}
         {{if .Narrator}} · Narrated by {{.Narrator}}{{end}}
     </div>
-    <div style="display:flex;gap:0.5rem;">
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
         {{if eq .EditionType "ebook"}}
             <a href="/read/{{.ID}}" class="btn btn-primary btn-sm">Read</a>
         {{else}}
             <a href="/listen/{{.ID}}" class="btn btn-primary btn-sm">Listen</a>
         {{end}}
         <a href="/download/{{.ID}}" class="btn btn-sm" style="background:var(--color-surface);">Download</a>
+
+        {{/* ── Send via... dropdown ── */}}
+        <div class="send-dropdown" style="position:relative;display:inline-block;">
+            <button class="btn btn-sm send-dropdown-toggle"
+                    style="background:var(--color-surface);"
+                    onclick="this.parentElement.classList.toggle('open')"
+                    type="button">
+                Send via… ▾
+            </button>
+            <div class="send-dropdown-menu"
+                 style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:0.375rem;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:50;min-width:220px;overflow:hidden;">
+
+                {{/* Send with code */}}
+                <div style="padding:0.5rem 0.75rem;border-bottom:1px solid var(--color-border);">
+                    <div style="font-size:0.8rem;font-weight:600;color:var(--color-text-muted);margin-bottom:0.375rem;">Send with code</div>
+                    <form hx-post="/receive/send/{{.ID}}"
+                          hx-target="#send-result-{{.ID}}"
+                          hx-swap="innerHTML"
+                          style="display:flex;gap:0.375rem;">
+                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                        <input type="text" name="code" placeholder="CODE"
+                               maxlength="4" required
+                               style="width:5rem;text-transform:uppercase;text-align:center;font-weight:700;font-family:monospace;letter-spacing:0.15rem;padding:0.3rem;">
+                        {{if eq .Format "epub"}}
+                        <label style="display:flex;align-items:center;gap:0.25rem;font-size:0.75rem;white-space:nowrap;cursor:pointer;" title="Convert to Kobo KEPUB format">
+                            <input type="checkbox" name="kepubify" value="on" style="width:auto;margin:0;">
+                            KEPUB
+                        </label>
+                        {{end}}
+                        <button type="submit" class="btn btn-primary btn-sm" style="white-space:nowrap;">Send</button>
+                    </form>
+                </div>
+
+                {{/* Send to Kindle (email) */}}
+                {{if $.CurrentUser}}{{if $.CurrentUser.KindleEmail}}{{if $.Config.HasSMTP}}
+                <a href="#" class="send-dropdown-item"
+                   hx-post="/send/{{.ID}}"
+                   hx-target="#send-result-{{.ID}}"
+                   hx-swap="innerHTML"
+                   style="display:block;padding:0.5rem 0.75rem;text-decoration:none;color:inherit;font-size:0.85rem;">
+                    📧 Send to Kindle ({{$.CurrentUser.KindleEmail}})
+                </a>
+                {{end}}{{end}}{{end}}
+
+                {{/* Link to receive page */}}
+                <a href="/receive" target="_blank"
+                   style="display:block;padding:0.5rem 0.75rem;text-decoration:none;color:var(--color-text-muted);font-size:0.8rem;border-top:1px solid var(--color-border);">
+                    ℹ️ Open receive page on e-reader
+                </a>
+            </div>
+        </div>
     </div>
+
+    {{/* Send result feedback area */}}
+    <div id="send-result-{{.ID}}" style="width:100%;"></div>
 </div>
 {{else}}
 <p style="color:var(--color-text-muted);">No editions available.</p>
 {{end}}
+
+<style>
+.send-dropdown.open .send-dropdown-menu { display: block !important; }
+</style>
+<script>
+// Close dropdowns when clicking outside.
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.send-dropdown')) {
+        document.querySelectorAll('.send-dropdown.open').forEach(function(el) {
+            el.classList.remove('open');
+        });
+    }
+});
+</script>
 {{end}}

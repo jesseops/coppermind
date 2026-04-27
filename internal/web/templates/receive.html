@@ -1,0 +1,123 @@
+{{define "title"}}Receive — Coppermind{{end}}
+{{define "content"}}
+{{if .IsEReader}}
+{{/* ── E-Reader view: show code and poll for downloads ── */}}
+<div style="text-align:center;padding:2rem 0;">
+    <h1 style="margin-bottom:0.5rem;">Send to {{.DeviceType}}</h1>
+    <p style="color:var(--color-text-muted);margin-bottom:2rem;">Enter this code on another device to send a book here.</p>
+
+    <div style="font-size:0.9rem;color:var(--color-text-muted);margin-bottom:0.5rem;">Your code:</div>
+    <div id="keycode" style="font-size:4rem;font-weight:800;letter-spacing:0.5rem;font-family:monospace;padding:1rem;background:var(--color-surface);border-radius:0.75rem;display:inline-block;min-width:200px;">
+        ····
+    </div>
+
+    <div style="margin-top:0.5rem;">
+        <button id="keygen-btn" onclick="generateKey()" style="background:none;border:none;color:var(--color-primary);cursor:pointer;font-size:0.9rem;">↻ New code</button>
+    </div>
+
+    <div id="download-area" style="display:none;margin-top:2rem;padding:1.5rem;background:var(--color-surface);border-radius:0.75rem;">
+        <div style="font-size:1.1rem;margin-bottom:0.75rem;">📥 <strong>Download ready!</strong></div>
+        <a id="download-link" href="#" class="btn btn-primary" style="font-size:1.1rem;padding:0.75rem 2rem;">Download</a>
+    </div>
+
+    <div id="status-msg" style="margin-top:1rem;color:var(--color-text-muted);font-size:0.85rem;">
+        Waiting for a book to be sent...
+    </div>
+</div>
+
+<script>
+var currentKey = null;
+var pollTimer = null;
+
+function generateKey() {
+    if (pollTimer) clearInterval(pollTimer);
+    document.getElementById('keycode').textContent = '····';
+    document.getElementById('download-area').style.display = 'none';
+    document.getElementById('status-msg').textContent = 'Generating code...';
+
+    var x = new XMLHttpRequest();
+    x.open('POST', '/receive/generate', true);
+    x.onload = function() {
+        if (x.status === 200 && x.responseText.length > 0) {
+            currentKey = x.responseText;
+            document.getElementById('keycode').textContent = currentKey;
+            document.getElementById('status-msg').textContent = 'Waiting for a book to be sent...';
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = setInterval(pollStatus, 4000);
+        } else {
+            document.getElementById('status-msg').textContent = 'Error generating code. Try again.';
+        }
+    };
+    x.onerror = function() {
+        document.getElementById('status-msg').textContent = 'Connection error. Check your wifi.';
+    };
+    x.send(null);
+}
+
+function pollStatus() {
+    if (!currentKey) return;
+    var x = new XMLHttpRequest();
+    x.open('GET', '/receive/status/' + currentKey, true);
+    x.onload = function() {
+        if (x.status === 404) {
+            // Key expired.
+            currentKey = null;
+            if (pollTimer) clearInterval(pollTimer);
+            document.getElementById('keycode').textContent = '····';
+            document.getElementById('download-area').style.display = 'none';
+            document.getElementById('status-msg').textContent = 'Code expired. Generating new one...';
+            setTimeout(generateKey, 1000);
+            return;
+        }
+        if (x.status !== 200) return;
+        try {
+            var data = JSON.parse(x.responseText);
+            if (data.file) {
+                document.getElementById('download-area').style.display = 'block';
+                document.getElementById('download-link').textContent = '📖 ' + data.file.name;
+                document.getElementById('download-link').href = '/receive/download/' + currentKey + '/' + encodeURIComponent(data.file.name);
+                document.getElementById('status-msg').textContent = 'Tap the button above to download.';
+            } else {
+                document.getElementById('download-area').style.display = 'none';
+                document.getElementById('status-msg').textContent = 'Waiting for a book to be sent...';
+            }
+        } catch(e) {}
+    };
+    x.send(null);
+}
+
+// Auto-generate on page load.
+generateKey();
+</script>
+
+{{else}}
+{{/* ── Normal browser: show instructions ── */}}
+<div style="max-width:600px;margin:2rem auto;text-align:center;">
+    <h1>Send to E-Reader</h1>
+    <p style="color:var(--color-text-muted);margin:1rem 0;">
+        Open this page on your <strong>Kobo</strong>, <strong>Kindle</strong>, or <strong>Tolino</strong> e-reader's built-in web browser.
+        A unique code will appear. Then use the <em>"Send with code"</em> option on any book to transfer it wirelessly.
+    </p>
+
+    <div style="background:var(--color-surface);border-radius:0.75rem;padding:1.5rem;margin:2rem 0;text-align:left;">
+        <h3 style="margin-top:0;">How it works</h3>
+        <ol style="padding-left:1.5rem;line-height:2;">
+            <li>On your e-reader, open the web browser</li>
+            <li>Navigate to <strong id="receive-url"></strong></li>
+            <li>A 4-character code will appear (e.g., <code style="font-size:1.1em;font-weight:700;">A3KR</code>)</li>
+            <li>On this device, find a book and click <em>"Send via… → Send with code"</em></li>
+            <li>Enter the code and click Send</li>
+            <li>The book will appear as a download on your e-reader</li>
+        </ol>
+    </div>
+
+    <p style="color:var(--color-text-muted);font-size:0.85rem;">
+        For Kobo devices, EPUB files can be automatically converted to Kobo's optimized KEPUB format.
+        Files are stored temporarily and deleted shortly after the e-reader disconnects.
+    </p>
+</div>
+<script>
+document.getElementById('receive-url').textContent = window.location.origin + '/receive';
+</script>
+{{end}}
+{{end}}
