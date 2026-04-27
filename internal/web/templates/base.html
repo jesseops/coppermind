@@ -8,13 +8,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
     <link rel="stylesheet" href="/static/css/app.css">
+    <script nonce="{{.Nonce}}" src="/static/js/alpine.min.js" defer></script>
+    <script nonce="{{.Nonce}}" src="/static/js/app.js" defer></script>
     <script nonce="{{.Nonce}}" src="/static/js/htmx.min.js"></script>
-    <script nonce="{{.Nonce}}">
-    (function() {
-        var t = localStorage.getItem('coppermind-theme') || 'auto';
-        document.documentElement.setAttribute('data-theme', t);
-    })();
-    </script>
 </head>
 <body hx-headers='{"X-CSRF-Token":"{{.CSRFToken}}"}'>
     {{template "nav" .}}
@@ -41,11 +37,8 @@
         <div class="flex items-center gap-3 flex-wrap">
             {{if .CurrentUser}}
                 {{if .CurrentUser.IsAdmin}}
-                {{/* Admin dropdown */}}
-                <div class="theme-picker" id="admin-menu">
-                    <button class="theme-picker-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Admin">
-                        ⚙️
-                    </button>
+                <div class="theme-picker" x-data="{ open: false }" x-on:click.outside="open = false" x-bind:class="open && 'open'">
+                    <button class="theme-picker-btn" x-on:click="open = !open" type="button" title="Admin">⚙️</button>
                     <div class="theme-picker-menu">
                         <a href="/admin/import" class="theme-option">📥 Import books</a>
                         <a href="/admin/users" class="theme-option">👥 Manage users</a>
@@ -53,11 +46,8 @@
                     </div>
                 </div>
                 {{end}}
-                {{/* User dropdown */}}
-                <div class="theme-picker" id="user-menu">
-                    <button class="theme-picker-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Account">
-                        {{.CurrentUser.DisplayName}}
-                    </button>
+                <div class="theme-picker" x-data="{ open: false }" x-on:click.outside="open = false" x-bind:class="open && 'open'">
+                    <button class="theme-picker-btn" x-on:click="open = !open" type="button" title="Account">{{.CurrentUser.DisplayName}}</button>
                     <div class="theme-picker-menu">
                         <a href="/me" class="theme-option">👤 Profile</a>
                         <a href="/me/shelves" class="theme-option">📚 My Shelves</a>
@@ -68,20 +58,18 @@
             {{else}}
                 <a href="/login" class="btn btn-surface btn-sm">Login</a>
             {{end}}
-            <div class="theme-picker" id="theme-picker">
-                <button class="theme-picker-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Change theme">
-                    🎨
-                </button>
+            <div class="theme-picker" x-data="{ open: false }" x-on:click.outside="open = false" x-bind:class="open && 'open'">
+                <button class="theme-picker-btn" x-on:click="open = !open" type="button" title="Change theme">🎨</button>
                 <div class="theme-picker-menu">
-                    <button class="theme-option" onclick="setTheme('auto')" data-theme-value="auto">
+                    <button class="theme-option" x-on:click="$store.theme.set('auto'); open = false" x-bind:class="$store.theme.current === 'auto' && 'active'">
                         <span class="theme-swatch bg-gradient-to-br from-[#EFEFE9] to-[#1A1D20]"></span>
                         Auto
                     </button>
-                    <button class="theme-option" onclick="setTheme('archives')" data-theme-value="archives">
+                    <button class="theme-option" x-on:click="$store.theme.set('archives'); open = false" x-bind:class="$store.theme.current === 'archives' && 'active'">
                         <span class="theme-swatch bg-[#EFEFE9] border-[#D4AF37]"></span>
                         Archives
                     </button>
-                    <button class="theme-option" onclick="setTheme('vault')" data-theme-value="vault">
+                    <button class="theme-option" x-on:click="$store.theme.set('vault'); open = false" x-bind:class="$store.theme.current === 'vault' && 'active'">
                         <span class="theme-swatch bg-[#1A1D20] border-[#B87333]"></span>
                         Vault
                     </button>
@@ -90,24 +78,4 @@
         </div>
     </div>
 </nav>
-<script nonce="{{.Nonce}}">
-function setTheme(name) {
-    document.documentElement.setAttribute('data-theme', name);
-    localStorage.setItem('coppermind-theme', name);
-    updateThemePicker();
-    document.getElementById('theme-picker').classList.remove('open');
-}
-function updateThemePicker() {
-    var current = document.documentElement.getAttribute('data-theme') || 'auto';
-    document.querySelectorAll('.theme-option').forEach(function(el) {
-        el.classList.toggle('active', el.getAttribute('data-theme-value') === current);
-    });
-}
-updateThemePicker();
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.theme-picker')) {
-        document.getElementById('theme-picker').classList.remove('open');
-    }
-});
-</script>
 {{end}}

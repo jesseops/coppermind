@@ -2,91 +2,27 @@
 {{define "content"}}
 {{if .IsEReader}}
 {{/* ── E-Reader view: show code and poll for downloads ── */}}
-<div class="text-center py-8">
+<div class="text-center py-8" x-data="receiveEReader">
     <h1 class="mb-2">Send to {{.DeviceType}}</h1>
     <p class="text-text-muted mb-8">Enter this code on another device to send a book here.</p>
 
     <div class="text-sm text-text-muted mb-2">Your code:</div>
-    <div id="keycode" class="text-6xl font-extrabold tracking-[0.5rem] font-mono p-4 bg-surface border border-border rounded-xl inline-block min-w-[200px]">
-        ····
-    </div>
+    <div class="text-6xl font-extrabold tracking-[0.5rem] font-mono p-4 bg-surface border border-border rounded-xl inline-block min-w-[200px]"
+         x-text="keyDisplay">····</div>
 
     <div class="mt-2">
-        <button id="keygen-btn" class="btn btn-sm btn-surface" onclick="generateKey()">↻ New code</button>
+        <button class="btn btn-sm btn-surface" x-on:click="generateKey()">↻ New code</button>
     </div>
 
-    <div id="download-area" class="hidden mt-8 p-6 bg-surface border border-border rounded-xl">
+    <div class="mt-8 p-6 bg-surface border border-border rounded-xl" x-show="downloadReady">
         <div class="text-lg mb-3">📥 <strong>Download ready!</strong></div>
-        <a id="download-link" href="#" class="btn btn-primary text-lg px-8 py-3">Download</a>
+        <a x-bind:href="downloadHref" class="btn btn-primary text-lg px-8 py-3" x-text="downloadName">Download</a>
     </div>
 
-    <div id="status-msg" class="mt-4 text-text-muted text-sm">
+    <div class="mt-4 text-text-muted text-sm" x-text="statusMsg">
         Waiting for a book to be sent...
     </div>
 </div>
-
-<script nonce="{{.Nonce}}">
-var currentKey = null;
-var pollTimer = null;
-
-function generateKey() {
-    if (pollTimer) clearInterval(pollTimer);
-    document.getElementById('keycode').textContent = '····';
-    document.getElementById('download-area').classList.add('hidden');
-    document.getElementById('status-msg').textContent = 'Generating code...';
-
-    var x = new XMLHttpRequest();
-    x.open('POST', '/receive/generate', true);
-    x.onload = function() {
-        if (x.status === 200 && x.responseText.length > 0) {
-            currentKey = x.responseText;
-            document.getElementById('keycode').textContent = currentKey;
-            document.getElementById('status-msg').textContent = 'Waiting for a book to be sent...';
-            if (pollTimer) clearInterval(pollTimer);
-            pollTimer = setInterval(pollStatus, 4000);
-        } else {
-            document.getElementById('status-msg').textContent = 'Error generating code. Try again.';
-        }
-    };
-    x.onerror = function() {
-        document.getElementById('status-msg').textContent = 'Connection error. Check your wifi.';
-    };
-    x.send(null);
-}
-
-function pollStatus() {
-    if (!currentKey) return;
-    var x = new XMLHttpRequest();
-    x.open('GET', '/receive/status/' + currentKey, true);
-    x.onload = function() {
-        if (x.status === 404) {
-            currentKey = null;
-            if (pollTimer) clearInterval(pollTimer);
-            document.getElementById('keycode').textContent = '····';
-            document.getElementById('download-area').classList.add('hidden');
-            document.getElementById('status-msg').textContent = 'Code expired. Generating new one...';
-            setTimeout(generateKey, 1000);
-            return;
-        }
-        if (x.status !== 200) return;
-        try {
-            var data = JSON.parse(x.responseText);
-            if (data.file) {
-                document.getElementById('download-area').classList.remove('hidden');
-                document.getElementById('download-link').textContent = '📖 ' + data.file.name;
-                document.getElementById('download-link').href = '/receive/download/' + currentKey + '/' + encodeURIComponent(data.file.name);
-                document.getElementById('status-msg').textContent = 'Tap the button above to download.';
-            } else {
-                document.getElementById('download-area').classList.add('hidden');
-                document.getElementById('status-msg').textContent = 'Waiting for a book to be sent...';
-            }
-        } catch(e) {}
-    };
-    x.send(null);
-}
-
-generateKey();
-</script>
 
 {{else}}
 {{/* ── Normal browser: show instructions ── */}}
@@ -101,7 +37,7 @@ generateKey();
         <h3 class="mt-0">How it works</h3>
         <ol class="pl-6 leading-loose">
             <li>On your e-reader, open the web browser</li>
-            <li>Navigate to <strong id="receive-url"></strong></li>
+            <li>Navigate to <strong x-data="receiveUrl" x-text="url"></strong></li>
             <li>A 4-character code will appear (e.g., <code class="text-lg font-bold text-primary">A3KR</code>)</li>
             <li>On this device, find a book and click <em>"Send via… → Send with code"</em></li>
             <li>Enter the code and click Send</li>
@@ -114,8 +50,5 @@ generateKey();
         Files are stored temporarily and deleted shortly after the e-reader disconnects.
     </p>
 </div>
-<script nonce="{{.Nonce}}">
-document.getElementById('receive-url').textContent = window.location.origin + '/receive';
-</script>
 {{end}}
 {{end}}

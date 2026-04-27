@@ -100,7 +100,7 @@
         <a href="/works/{{.ID}}" class="no-underline text-inherit">
             <div class="cover">
                 {{if .HasCover}}
-                    <img src="/covers/{{.ID}}" alt="{{.Title}}" loading="lazy">
+                    <img data-src="/covers/{{.ID}}" alt="{{.Title}}" class="lazy">
                 {{else}}
                     {{coverInitials .Title}}
                 {{end}}
@@ -112,9 +112,9 @@
                 {{if .HasAudiobook}}<span class="badge badge-audiobook">audio</span>{{end}}
             </div>
         </a>
-        {{/* Card action menu */}}
+        {{/* Card action menu — no x-data, toggled via delegated click handler */}}
         <div class="card-actions">
-            <button class="card-actions-btn" onclick="this.parentElement.classList.toggle('open')" type="button" title="Actions">⋮</button>
+            <button class="card-actions-btn" type="button" title="Actions">⋮</button>
             <div class="card-actions-menu">
                 {{$ed := index $.EditionMap .ID}}
                 {{if $ed}}
@@ -124,7 +124,7 @@
                     <a href="/listen/{{$ed.ID}}" class="card-action">🎧 Listen</a>
                     {{end}}
                     <a href="/download/{{$ed.ID}}" class="card-action">⬇️ Download</a>
-                    <div class="card-action send-inline" onclick="event.stopPropagation()">
+                    <div class="card-action send-inline">
                         <form hx-post="/receive/send/{{$ed.ID}}" hx-target="closest .card-actions-menu" hx-swap="innerHTML"
                               class="flex gap-1 items-center px-2 py-1">
                             <span class="text-xs">📲</span>
@@ -168,7 +168,7 @@
         {{range .Works}}
         <tr class="hover:bg-surface-hover transition">
             <td>
-                {{if .HasCover}}<img src="/covers/{{.ID}}" class="w-8 h-10 object-cover rounded" loading="lazy">
+                {{if .HasCover}}<img data-src="/covers/{{.ID}}" class="w-8 h-10 object-cover rounded lazy">
                 {{else}}<div class="w-8 h-10 bg-surface rounded flex items-center justify-center text-xs text-text-muted">{{coverInitials .Title}}</div>{{end}}
             </td>
             <td><a href="/works/{{.ID}}" class="font-medium">{{.Title}}</a></td>

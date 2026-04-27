@@ -388,7 +388,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	// Set CSP header with nonce.
 	nonce := data["Nonce"].(string)
 	csp := fmt.Sprintf(
-		"default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https://covers.openlibrary.org data:; connect-src 'self'",
+		"default-src 'self'; script-src 'nonce-%s' 'strict-dynamic' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https://covers.openlibrary.org data:; connect-src 'self'",
 		nonce,
 	)
 	w.Header().Set("Content-Security-Policy", csp)

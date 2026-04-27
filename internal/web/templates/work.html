@@ -1,6 +1,6 @@
 {{define "title"}}{{.Work.Title}} — Coppermind{{end}}
 {{define "content"}}
-<div class="flex gap-8 mt-4 flex-wrap md:flex-nowrap">
+<div class="flex gap-8 mt-4 flex-wrap md:flex-nowrap" x-data="workPage">
     {{/* Cover */}}
     <div class="shrink-0 w-[200px]">
         <div id="work-cover" class="cover w-[200px] aspect-[2/3] rounded-lg overflow-hidden bg-surface flex items-center justify-center text-5xl text-text-muted">
@@ -121,9 +121,9 @@
             <a href="/download/{{.ID}}" class="btn btn-surface btn-sm">Download</a>
 
             {{/* Send via... dropdown */}}
-            <div class="send-dropdown">
+            <div class="send-dropdown" x-data="{ open: false }" x-on:click.outside="open = false" x-bind:class="open && 'open'">
                 <button class="btn btn-surface btn-sm"
-                        onclick="this.parentElement.classList.toggle('open')"
+                        x-on:click="open = !open"
                         type="button">
                     Send via… ▾
                 </button>
@@ -184,13 +184,14 @@
         {{end}}
 
         {{/* Edit toggle button */}}
-        <button class="btn btn-surface btn-sm text-xs edition-edit-toggle" onclick="this.nextElementSibling.classList.toggle('hidden'); this.textContent = this.textContent === '✏️ Edit' ? '✕ Close' : '✏️ Edit';" type="button">✏️ Edit</button>
+        <div x-data="editionEdit">
+        <button class="btn btn-surface btn-sm text-xs edition-edit-toggle" x-on:click="toggle" x-text="label" type="button">✏️ Edit</button>
 
         {{/* Edit form (hidden by default) */}}
-        <form hx-post="/admin/editions/{{.ID}}"
+        <form hx-post="/admin/editions/{{.ID}}" x-show="editing"
               hx-target="#edition-status-{{.ID}}"
               hx-swap="innerHTML"
-              class="hidden mt-2 flex gap-2 items-center flex-wrap">
+              class="mt-2 flex gap-2 items-center flex-wrap">
             <label class="text-xs font-medium whitespace-nowrap">ISBN:</label>
             <input type="text" name="isbn" value="{{.ISBN}}" placeholder="Enter ISBN"
                    class="w-56 text-xs py-1 px-2">
@@ -200,6 +201,7 @@
             <button type="submit" class="btn btn-primary btn-sm">Save</button>
             <span id="edition-status-{{.ID}}"></span>
         </form>
+        </div>
 
         {{if .Notes}}
         <div class="text-xs text-text-muted mt-1.5">📝 {{.Notes}}</div>
@@ -213,29 +215,5 @@
 <p class="text-text-muted">No editions available.</p>
 {{end}}
 
-<script nonce="{{.Nonce}}">
-// Close send dropdowns when clicking outside.
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.send-dropdown')) {
-        document.querySelectorAll('.send-dropdown.open').forEach(function(el) {
-            el.classList.remove('open');
-        });
-    }
-});
 
-// Refresh cover image when cover is updated via HTMX.
-document.body.addEventListener('coverUpdated', function() {
-    var img = document.querySelector('#work-cover img');
-    if (img) {
-        img.src = img.src.split('?')[0] + '?v=' + Date.now();
-    } else {
-        location.reload();
-    }
-});
-
-// Refresh page when metadata is applied.
-document.body.addEventListener('metadataUpdated', function() {
-    setTimeout(function() { location.reload(); }, 1500);
-});
-</script>
 {{end}}

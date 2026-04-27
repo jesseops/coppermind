@@ -12,6 +12,6 @@
 </form>
 <form method="POST" action="/admin/works/{{.Work.ID}}/delete" class="mt-8 border-t border-border pt-4">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-    <button type="submit" class="btn btn-sm bg-error text-white" onclick="return confirm('Delete this work?')">Delete Work</button>
+    <button type="submit" class="btn btn-sm bg-error text-white" x-data="confirmDelete" x-on:click="confirmAndSubmit('Delete this work?', $event)">Delete Work</button>
 </form>
 {{end}}

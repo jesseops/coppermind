@@ -1,8 +1,9 @@
 {{define "title"}}Reading: {{.Work.Title}} — Coppermind{{end}}
 {{define "content"}}
+<div x-data="readerProgress({{.Edition.ID}}, {{.CurrentCh}}, {{.TotalChapters}}, {{.Work.ID}}, '{{.CSRFToken}}')">
 <div class="my-4 flex items-center gap-4">
     <a href="/works/{{.Work.ID}}">← {{.Work.Title}}</a>
-    <select onchange="window.location.href='/read/{{.Edition.ID}}?chapter='+this.value" class="w-auto">
+    <select x-data="chapterSelect" x-on:change="navigate({{.Edition.ID}}, $event)" class="w-auto">
         {{range .Chapters}}<option value="{{.Index}}" {{if eq .Index $.CurrentCh}}selected{{end}}>{{.Title}}</option>{{end}}
     </select>
     <span class="text-text-muted text-sm ml-auto">Ch {{add .CurrentCh 1}}/{{.TotalChapters}}</span>
@@ -16,43 +17,8 @@
     {{if lt .CurrentCh (subtract .TotalChapters 1)}}
     <a href="/read/{{.Edition.ID}}?chapter={{add .CurrentCh 1}}" class="btn btn-sm">Next →</a>
     {{else}}
-    <button class="btn btn-primary btn-sm" onclick="markFinished()">✓ Mark as finished</button>
+    <button class="btn btn-primary btn-sm" x-on:click="markFinished()">✓ Mark as finished</button>
     {{end}}
 </div>
-
-<script nonce="{{.Nonce}}">
-// Save reading progress periodically.
-(function() {
-    var editionID = {{.Edition.ID}};
-    var chapter = {{.CurrentCh}};
-    var total = {{.TotalChapters}};
-    var progress = total > 0 ? chapter / total : 0;
-
-    function saveProgress() {
-        var body = 'progress=' + progress + '&chapter_index=' + chapter;
-        var x = new XMLHttpRequest();
-        x.open('POST', '/api/v1/me/reading/' + editionID, true);
-        x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        x.setRequestHeader('X-CSRF-Token', document.body.getAttribute('hx-headers') ? JSON.parse(document.body.getAttribute('hx-headers'))['X-CSRF-Token'] : '');
-        x.send(body);
-    }
-
-    // Save on page load (chapter change).
-    saveProgress();
-
-    // Save periodically while reading (every 60s).
-    setInterval(saveProgress, 60000);
-})();
-
-function markFinished() {
-    var editionID = {{.Edition.ID}};
-    var body = 'progress=1&chapter_index={{.CurrentCh}}&status=finished';
-    var x = new XMLHttpRequest();
-    x.open('POST', '/api/v1/me/reading/' + editionID, true);
-    x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    x.setRequestHeader('X-CSRF-Token', document.body.getAttribute('hx-headers') ? JSON.parse(document.body.getAttribute('hx-headers'))['X-CSRF-Token'] : '');
-    x.onload = function() { alert('Marked as finished!'); window.location.href = '/works/{{.Work.ID}}'; };
-    x.send(body);
-}
-</script>
+</div>
 {{end}}
