@@ -36,6 +36,7 @@ func newRootCmd() *cobra.Command {
 		newServeCmd(),
 		newImportCmd(),
 		newBulkImportCmd(),
+		newReparseCmd(),
 		newAddUserCmd(),
 		newResetPasswordCmd(),
 		newListUsersCmd(),
