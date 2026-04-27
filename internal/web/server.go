@@ -36,23 +36,25 @@ var staticFS embed.FS
 
 // Server is the main HTTP server.
 type Server struct {
-	store    store.Store
-	importer *importer.Importer
-	config   *config.Config
-	pages    map[string]*template.Template // per-page templates (each includes base)
-	secret   []byte
-	router   chi.Router
-	sends    *sendStore // in-memory key store for send-to-ereader
+	store       store.Store
+	importer    *importer.Importer
+	config      *config.Config
+	pages       map[string]*template.Template // per-page templates (each includes base)
+	secret      []byte
+	router      chi.Router
+	sends       *sendStore    // in-memory key store for send-to-ereader
+	loginLimiter *rateLimiter // IP-based login rate limiter
 }
 
 // NewServer creates a new web server.
 func NewServer(s store.Store, cfg *config.Config) (*Server, error) {
 	srv := &Server{
-		store:    s,
-		importer: importer.NewImporter(s, cfg.DataDir),
-		config:   cfg,
-		secret:   cfg.SessionSecretBytes(),
-		sends:    newSendStore(),
+		store:        s,
+		importer:     importer.NewImporter(s, cfg.DataDir),
+		config:       cfg,
+		secret:       cfg.SessionSecretBytes(),
+		sends:        newSendStore(),
+		loginLimiter: newRateLimiter(5, 60*time.Second),
 	}
 
 	// Parse templates — each page gets its own clone of the base template

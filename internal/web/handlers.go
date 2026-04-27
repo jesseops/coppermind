@@ -222,6 +222,14 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
+	// Rate limit login attempts by IP.
+	ip := clientIP(r)
+	if !s.loginLimiter.allow(ip) {
+		w.Header().Set("Retry-After", "60")
+		http.Error(w, "Too many login attempts. Please try again later.", http.StatusTooManyRequests)
+		return
+	}
+
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 	rememberMe := r.FormValue("remember_me") == "on"
