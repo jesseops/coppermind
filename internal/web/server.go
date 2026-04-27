@@ -22,12 +22,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"github.com/jesseops/coppermind/internal/auth"
 	"github.com/jesseops/coppermind/internal/config"
 	"github.com/jesseops/coppermind/internal/importer"
 	"github.com/jesseops/coppermind/internal/store"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 //go:embed templates/*.html
@@ -38,13 +38,13 @@ var staticFS embed.FS
 
 // Server is the main HTTP server.
 type Server struct {
-	store       store.Store
-	importer    *importer.Importer
-	config      *config.Config
-	pages       map[string]*template.Template // per-page templates (each includes base)
-	secret      []byte
-	router      chi.Router
-	sends       *sendStore    // in-memory key store for send-to-ereader
+	store        store.Store
+	importer     *importer.Importer
+	config       *config.Config
+	pages        map[string]*template.Template // per-page templates (each includes base)
+	secret       []byte
+	router       chi.Router
+	sends        *sendStore   // in-memory key store for send-to-ereader
 	loginLimiter *rateLimiter // IP-based login rate limiter
 }
 
@@ -62,11 +62,11 @@ func NewServer(s store.Store, cfg *config.Config) (*Server, error) {
 	// Parse templates — each page gets its own clone of the base template
 	// so that "title" and "content" block definitions don't collide.
 	funcs := template.FuncMap{
-		"urlquery":  url.QueryEscape,
-		"lower":     strings.ToLower,
-		"title":     cases.Title(language.English).String,
-		"hasPrefix": strings.HasPrefix,
-		"csrfToken": func() string { return "" },
+		"urlquery":    url.QueryEscape,
+		"lower":       strings.ToLower,
+		"title":       cases.Title(language.English).String,
+		"hasPrefix":   strings.HasPrefix,
+		"csrfToken":   func() string { return "" },
 		"currentUser": func() any { return nil },
 		"formatDate": func(t time.Time) string {
 			if t.IsZero() {
@@ -100,9 +100,9 @@ func NewServer(s store.Store, cfg *config.Config) (*Server, error) {
 			return fmt.Sprintf("%dm", m)
 		},
 		"coverInitials": coverInitials,
-		"subtract": func(a, b int) int { return a - b },
-		"add":      func(a, b int) int { return a + b },
-		"multiply": func(a float64, b int) float64 { return a * float64(b) },
+		"subtract":      func(a, b int) int { return a - b },
+		"add":           func(a, b int) int { return a + b },
+		"multiply":      func(a float64, b int) float64 { return a * float64(b) },
 		"dict": func(values ...any) map[string]any {
 			m := make(map[string]any)
 			for i := 0; i+1 < len(values); i += 2 {
@@ -298,6 +298,7 @@ func (s *Server) buildRouter() chi.Router {
 			r.Post("/admin/works/{id}/hide", s.handleAdminToggleHide)
 			r.Get("/admin/librarian", s.handleAdminLibrarian)
 			r.Post("/admin/librarian/bulk", s.handleAdminLibrarianBulk)
+			r.Post("/admin/librarian/duplicates/merge", s.handleAdminMergeDuplicates)
 			r.Post("/admin/editions/{id}", s.handleAdminUpdateEdition)
 			r.Get("/admin/works/{id}/covers/search", s.handleAdminCoverSearch)
 			r.Post("/admin/works/{id}/covers/apply", s.handleAdminCoverApply)

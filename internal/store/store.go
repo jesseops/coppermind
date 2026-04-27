@@ -43,6 +43,7 @@ type Store interface {
 	GetWork(id int64) (*domain.Work, error)
 	UpdateWork(id int64, updates WorkUpdate) error
 	DeleteWork(id int64) error
+	MergeWorks(targetID int64, sourceIDs []int64) error
 	ListWorks(filter WorkFilter) ([]domain.Work, int, error)
 	FindWorkByTitleAndAuthor(libraryID int64, sortTitle, authorSortName string) (*domain.Work, error)
 

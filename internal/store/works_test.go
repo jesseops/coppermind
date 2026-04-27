@@ -93,6 +93,59 @@ func TestListWorksFiltering(t *testing.T) {
 	}
 }
 
+func TestMergeWorks(t *testing.T) {
+	s := newTestStore(t)
+	lib, _ := s.CreateLibrary("Test")
+
+	target := &domain.Work{LibraryID: lib.ID, Title: "Dune"}
+	if err := s.CreateWork(target); err != nil {
+		t.Fatal(err)
+	}
+	sourceDesc := "A desert planet."
+	source := &domain.Work{LibraryID: lib.ID, Title: "Dune", Description: sourceDesc, CoverPath: "covers/dune.jpg"}
+	if err := s.CreateWork(source); err != nil {
+		t.Fatal(err)
+	}
+
+	author, _ := s.CreateAuthor("Frank Herbert", "herbert, frank")
+	if err := s.LinkWorkAuthor(source.ID, author.ID, domain.RoleAuthorOf); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddTag(source.ID, "sci-fi"); err != nil {
+		t.Fatal(err)
+	}
+	edition := &domain.Edition{WorkID: source.ID, EditionType: domain.EditionTypeEbook, Format: domain.FormatEPUB, FileHash: "hash"}
+	if err := s.CreateEdition(edition); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.MergeWorks(target.ID, []int64{source.ID}); err != nil {
+		t.Fatalf("MergeWorks: %v", err)
+	}
+
+	merged, err := s.GetWork(target.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if merged.Description != sourceDesc || merged.CoverPath != "covers/dune.jpg" {
+		t.Fatalf("metadata not copied: %+v", merged)
+	}
+	if len(merged.Authors) != 1 || merged.Authors[0].AuthorName != "Frank Herbert" {
+		t.Fatalf("authors not merged: %+v", merged.Authors)
+	}
+	tags, _ := s.ListTags(target.ID)
+	if len(tags) != 1 || tags[0] != "sci-fi" {
+		t.Fatalf("tags not merged: %+v", tags)
+	}
+	editions, _ := s.ListEditions(target.ID)
+	if len(editions) != 1 || editions[0].ID != edition.ID {
+		t.Fatalf("editions not moved: %+v", editions)
+	}
+	if _, err := s.GetWork(source.ID); err == nil {
+		t.Fatal("source work still exists")
+	}
+}
+
 func TestWorkAuthorRelationship(t *testing.T) {
 	s := newTestStore(t)
 	lib, _ := s.CreateLibrary("Test")

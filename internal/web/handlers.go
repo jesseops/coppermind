@@ -890,6 +890,40 @@ func (s *Server) handleAdminLibrarianBulk(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
 }
 
+func (s *Server) handleAdminMergeDuplicates(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	targetID, err := strconv.ParseInt(r.FormValue("keep_id"), 10, 64)
+	if err != nil || targetID == 0 {
+		http.Error(w, "Choose a work to keep", http.StatusBadRequest)
+		return
+	}
+
+	var sourceIDs []int64
+	for _, raw := range r.Form["work_id"] {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id == 0 || id == targetID {
+			continue
+		}
+		sourceIDs = append(sourceIDs, id)
+	}
+	if len(sourceIDs) == 0 {
+		http.Redirect(w, r, "/admin/librarian?issue=duplicates", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.store.MergeWorks(targetID, sourceIDs); err != nil {
+		slog.Error("merge duplicate works", "target", targetID, "sources", sourceIDs, "err", err)
+		http.Error(w, "Could not merge duplicate works", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/librarian?issue=duplicates", http.StatusSeeOther)
+}
+
 // reparseWork re-extracts metadata from the first edition's source file
 // and updates the work's title, authors, description, and language.
 func (s *Server) reparseWork(workID int64) {

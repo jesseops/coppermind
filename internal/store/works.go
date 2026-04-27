@@ -148,6 +148,84 @@ func (s *SQLiteStore) DeleteWork(id int64) error {
 	return nil
 }
 
+// MergeWorks moves all editions and relationships from source works into targetID,
+// then deletes the source works. Target metadata is preserved, with empty optional
+// fields filled from source works when possible.
+func (s *SQLiteStore) MergeWorks(targetID int64, sourceIDs []int64) error {
+	if targetID == 0 {
+		return fmt.Errorf("target work required")
+	}
+	if len(sourceIDs) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var targetLibraryID int64
+	if err := tx.QueryRow("SELECT library_id FROM works WHERE id = ?", targetID).Scan(&targetLibraryID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("target work %d not found", targetID)
+		}
+		return err
+	}
+
+	for _, sourceID := range sourceIDs {
+		if sourceID == 0 || sourceID == targetID {
+			continue
+		}
+
+		var sourceLibraryID int64
+		if err := tx.QueryRow("SELECT library_id FROM works WHERE id = ?", sourceID).Scan(&sourceLibraryID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("source work %d not found", sourceID)
+			}
+			return err
+		}
+		if sourceLibraryID != targetLibraryID {
+			return fmt.Errorf("cannot merge works from different libraries")
+		}
+
+		// Fill missing optional metadata on the target from the source before deleting it.
+		if _, err := tx.Exec(`
+			UPDATE works SET
+				description = CASE WHEN description IS NULL OR description = '' THEN (SELECT description FROM works WHERE id = ?) ELSE description END,
+				series_id = CASE WHEN series_id IS NULL THEN (SELECT series_id FROM works WHERE id = ?) ELSE series_id END,
+				series_index = CASE WHEN series_index IS NULL THEN (SELECT series_index FROM works WHERE id = ?) ELSE series_index END,
+				language = CASE WHEN language IS NULL OR language = '' THEN (SELECT language FROM works WHERE id = ?) ELSE language END,
+				first_published = CASE WHEN first_published IS NULL THEN (SELECT first_published FROM works WHERE id = ?) ELSE first_published END,
+				cover_path = CASE WHEN cover_path IS NULL OR cover_path = '' THEN (SELECT cover_path FROM works WHERE id = ?) ELSE cover_path END,
+				updated_at = datetime('now')
+			WHERE id = ?`, sourceID, sourceID, sourceID, sourceID, sourceID, sourceID, targetID); err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec("UPDATE editions SET work_id = ?, updated_at = datetime('now') WHERE work_id = ?", targetID, sourceID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("INSERT OR IGNORE INTO work_authors (work_id, author_id, role) SELECT ?, author_id, role FROM work_authors WHERE work_id = ?", targetID, sourceID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("INSERT OR IGNORE INTO work_tags (work_id, tag) SELECT ?, tag FROM work_tags WHERE work_id = ?", targetID, sourceID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("INSERT OR IGNORE INTO shelf_works (shelf_id, work_id, added_at) SELECT shelf_id, ?, added_at FROM shelf_works WHERE work_id = ?", targetID, sourceID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("INSERT OR IGNORE INTO user_ratings (user_id, work_id, rating, review, created_at) SELECT user_id, ?, rating, review, created_at FROM user_ratings WHERE work_id = ?", targetID, sourceID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("DELETE FROM works WHERE id = ?", sourceID); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (s *SQLiteStore) FindWorkByTitleAndAuthor(libraryID int64, sortTitle, authorSortName string) (*domain.Work, error) {
 	var workID int64
 	err := s.db.QueryRow(`
