@@ -107,7 +107,7 @@ func (s *SQLiteStore) RemoveFromShelf(shelfID, workID int64) error {
 func (s *SQLiteStore) ListShelfWorks(shelfID int64) ([]domain.Work, error) {
 	rows, err := s.db.Query(`
 		SELECT w.id, w.library_id, w.title, w.sort_title, w.description, w.series_id, w.series_index,
-		       w.language, w.first_published, w.cover_path, w.created_at, w.updated_at
+		       w.language, w.first_published, w.cover_path, w.created_at, w.updated_at, w.hidden
 		FROM works w
 		JOIN shelf_works sw ON sw.work_id = w.id
 		WHERE sw.shelf_id = ?

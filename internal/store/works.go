@@ -36,7 +36,7 @@ func (s *SQLiteStore) CreateWork(w *domain.Work) error {
 func (s *SQLiteStore) GetWork(id int64) (*domain.Work, error) {
 	w, err := s.scanWork(
 		`SELECT id, library_id, title, sort_title, description, series_id, series_index,
-		        language, first_published, cover_path, created_at, updated_at
+		        language, first_published, cover_path, created_at, updated_at, hidden
 		 FROM works WHERE id = ?`, id)
 	if err != nil {
 		return nil, err
@@ -107,6 +107,14 @@ func (s *SQLiteStore) UpdateWork(id int64, updates WorkUpdate) error {
 	if updates.CoverPath != nil {
 		clauses = append(clauses, "cover_path = ?")
 		args = append(args, nullOrEmpty(*updates.CoverPath))
+	}
+	if updates.Hidden != nil {
+		h := 0
+		if *updates.Hidden {
+			h = 1
+		}
+		clauses = append(clauses, "hidden = ?")
+		args = append(args, h)
 	}
 
 	if len(clauses) == 0 {
@@ -191,6 +199,23 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 		)`)
 		args = append(args, filter.ShelfID)
 	}
+	if !filter.IncludeHidden && !filter.OnlyHidden {
+		where = append(where, "w.hidden = 0")
+	}
+	if filter.OnlyHidden {
+		where = append(where, "w.hidden = 1")
+	}
+	if filter.MissingCover {
+		where = append(where, "(w.cover_path IS NULL OR w.cover_path = '')")
+	}
+	if filter.MissingAuthor {
+		where = append(where, `NOT EXISTS (
+			SELECT 1 FROM work_authors wa4 WHERE wa4.work_id = w.id
+		)`)
+	}
+	if filter.MissingDesc {
+		where = append(where, "(w.description IS NULL OR w.description = '')")
+	}
 
 	whereClause := strings.Join(where, " AND ")
 
@@ -223,7 +248,7 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 
 	q := fmt.Sprintf(`
 		SELECT w.id, w.library_id, w.title, w.sort_title, w.description, w.series_id, w.series_index,
-		       w.language, w.first_published, w.cover_path, w.created_at, w.updated_at
+		       w.language, w.first_published, w.cover_path, w.created_at, w.updated_at, w.hidden
 		FROM works w
 		WHERE %s
 		ORDER BY %s`, whereClause, orderBy)
@@ -311,13 +336,14 @@ func scanWorkFromRow(row singleRowScanner) (*domain.Work, error) {
 	var seriesID sql.NullInt64
 	var seriesIndex sql.NullFloat64
 	var firstPub sql.NullInt64
+	var hidden int
 	var createdAt, updatedAt string
 
 	err := row.Scan(
 		&w.ID, &w.LibraryID, &w.Title, &w.SortTitle,
 		&desc, &seriesID, &seriesIndex,
 		&language, &firstPub, &coverPath,
-		&createdAt, &updatedAt,
+		&createdAt, &updatedAt, &hidden,
 	)
 	if err != nil {
 		return nil, err
@@ -329,6 +355,7 @@ func scanWorkFromRow(row singleRowScanner) (*domain.Work, error) {
 	w.Language = language.String
 	w.FirstPublished = int(firstPub.Int64)
 	w.CoverPath = coverPath.String
+	w.Hidden = hidden != 0
 	w.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
 	w.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
 	return &w, nil
@@ -340,13 +367,14 @@ func scanWorkRow(rows *sql.Rows) (*domain.Work, error) {
 	var seriesID sql.NullInt64
 	var seriesIndex sql.NullFloat64
 	var firstPub sql.NullInt64
+	var hidden int
 	var createdAt, updatedAt string
 
 	err := rows.Scan(
 		&w.ID, &w.LibraryID, &w.Title, &w.SortTitle,
 		&desc, &seriesID, &seriesIndex,
 		&language, &firstPub, &coverPath,
-		&createdAt, &updatedAt,
+		&createdAt, &updatedAt, &hidden,
 	)
 	if err != nil {
 		return nil, err
@@ -358,6 +386,7 @@ func scanWorkRow(rows *sql.Rows) (*domain.Work, error) {
 	w.Language = language.String
 	w.FirstPublished = int(firstPub.Int64)
 	w.CoverPath = coverPath.String
+	w.Hidden = hidden != 0
 	w.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
 	w.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
 	return &w, nil

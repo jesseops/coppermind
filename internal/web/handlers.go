@@ -663,6 +663,100 @@ func (s *Server) handleAdminDuplicates(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "admin_duplicates.html", nil)
 }
 
+func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
+	libs, err := s.store.ListLibraries()
+	if err != nil || len(libs) == 0 {
+		http.Error(w, "No libraries", http.StatusInternalServerError)
+		return
+	}
+
+	issue := r.URL.Query().Get("issue")
+	q := r.URL.Query().Get("q")
+
+	filter := store.WorkFilter{
+		LibraryID: libs[0].ID,
+		Query:     q,
+		SortBy:    "title",
+	}
+
+	switch issue {
+	case "no-cover":
+		filter.MissingCover = true
+		filter.IncludeHidden = true
+	case "no-author":
+		filter.MissingAuthor = true
+		filter.IncludeHidden = true
+	case "no-description":
+		filter.MissingDesc = true
+		filter.IncludeHidden = true
+	case "hidden":
+		filter.OnlyHidden = true
+	default:
+		// "all issues" — show everything that has at least one problem
+		filter.IncludeHidden = true
+	}
+
+	works, total, _ := s.store.ListWorks(filter)
+
+	// If "all" mode (no specific issue), filter to works that have at least one issue.
+	if issue == "" {
+		var filtered []domain.Work
+		for _, w := range works {
+			if !w.HasCover() || len(w.Authors) == 0 || w.Description == "" {
+				filtered = append(filtered, w)
+			}
+		}
+		works = filtered
+		total = len(filtered)
+	}
+
+	// Count per issue for the sidebar.
+	allWorks, _, _ := s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, IncludeHidden: true})
+	counts := map[string]int{}
+	for _, w := range allWorks {
+		if !w.HasCover() {
+			counts["no-cover"]++
+		}
+		if len(w.Authors) == 0 {
+			counts["no-author"]++
+		}
+		if w.Description == "" {
+			counts["no-description"]++
+		}
+		if w.Hidden {
+			counts["hidden"]++
+		}
+	}
+
+	data := templateData{
+		"Works":  works,
+		"Total":  total,
+		"Issue":  issue,
+		"Query":  q,
+		"Counts": counts,
+	}
+
+	s.render(w, r, "admin_librarian.html", data)
+}
+
+func (s *Server) handleAdminToggleHide(w http.ResponseWriter, r *http.Request) {
+	workID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	work, err := s.store.GetWork(workID)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	newHidden := !work.Hidden
+	s.store.UpdateWork(workID, store.WorkUpdate{Hidden: &newHidden})
+
+	// If HTMX request, trigger a page refresh.
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Refresh", "true")
+		return
+	}
+	http.Redirect(w, r, r.Referer(), http.StatusSeeOther)
+}
+
 // rewriteEpubAssetURLs rewrites relative src/href attributes in EPUB chapter
 // HTML to point to the /epub-asset/{editionID}/... endpoint.
 func rewriteEpubAssetURLs(html string, editionID int64, chapterPath string) string {

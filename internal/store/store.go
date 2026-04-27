@@ -90,16 +90,21 @@ type Store interface {
 
 // WorkFilter specifies criteria for listing works.
 type WorkFilter struct {
-	LibraryID int64
-	Query     string // text search across title, author, series
-	Type      string // "ebook", "audiobook", or "" for all
-	SeriesID  int64
-	AuthorID  int64
-	ShelfID   int64
-	SortBy    string // "title", "author", "created_at", "updated_at", "series", "year"
-	SortOrder string // "asc" or "desc"
-	Limit     int
-	Offset    int
+	LibraryID     int64
+	Query         string // text search across title, author, series
+	Type          string // "ebook", "audiobook", or "" for all
+	SeriesID      int64
+	AuthorID      int64
+	ShelfID       int64
+	SortBy        string // "title", "author", "created_at", "updated_at", "series", "year"
+	SortOrder     string // "asc" or "desc"
+	Limit         int
+	Offset        int
+	IncludeHidden bool   // if false (default), hidden works are excluded
+	OnlyHidden    bool   // if true, only return hidden works
+	MissingCover  bool   // if true, only return works without covers
+	MissingAuthor bool   // if true, only return works with no authors
+	MissingDesc   bool   // if true, only return works with no description
 }
 
 // WorkUpdate specifies partial updates to a work.
@@ -111,6 +116,7 @@ type WorkUpdate struct {
 	Language       *string
 	FirstPublished *int
 	CoverPath      *string
+	Hidden         *bool
 }
 
 // EditionUpdate specifies partial updates to an edition.

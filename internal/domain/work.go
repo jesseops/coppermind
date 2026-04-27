@@ -20,6 +20,7 @@ type Work struct {
 	CoverPath      string    `db:"cover_path" json:"cover_path,omitempty"`
 	CreatedAt      time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt      time.Time `db:"updated_at" json:"updated_at"`
+	Hidden         bool      `db:"hidden" json:"hidden,omitempty"`
 
 	// Denormalized fields for list views — populated by queries, not stored in works table.
 	Authors      []WorkAuthor `db:"-" json:"authors,omitempty"`

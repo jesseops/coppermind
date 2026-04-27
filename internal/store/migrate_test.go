@@ -28,8 +28,8 @@ func TestRunMigrations(t *testing.T) {
 	if err := db.QueryRow("SELECT version FROM schema_version").Scan(&version); err != nil {
 		t.Fatalf("query version: %v", err)
 	}
-	if version != 1 {
-		t.Errorf("version = %d, want 1", version)
+	if version != 2 {
+		t.Errorf("version = %d, want 2", version)
 	}
 
 	// Check tables exist.

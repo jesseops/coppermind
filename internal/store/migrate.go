@@ -166,6 +166,13 @@ CREATE INDEX idx_tracks_edition_id  ON tracks(edition_id);
 CREATE INDEX idx_shelves_user_id    ON shelves(user_id);
 `,
 	},
+	{
+		version: 2,
+		sql: `
+ALTER TABLE works ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX idx_works_hidden ON works(hidden);
+`,
+	},
 }
 
 // RunMigrations applies all pending migrations to the database.

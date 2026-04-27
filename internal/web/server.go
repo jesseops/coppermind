@@ -295,6 +295,8 @@ func (s *Server) buildRouter() chi.Router {
 			r.Post("/admin/works/{id}", s.handleAdminEditSubmit)
 			r.Post("/admin/works/{id}/delete", s.handleAdminDeleteWork)
 			r.Post("/admin/works/{id}/reparse", s.handleAdminReparse)
+			r.Post("/admin/works/{id}/hide", s.handleAdminToggleHide)
+			r.Get("/admin/librarian", s.handleAdminLibrarian)
 			r.Post("/admin/editions/{id}", s.handleAdminUpdateEdition)
 			r.Get("/admin/works/{id}/covers/search", s.handleAdminCoverSearch)
 			r.Post("/admin/works/{id}/covers/apply", s.handleAdminCoverApply)

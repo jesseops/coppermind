@@ -42,6 +42,12 @@
         {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}
             <div class="mt-4 flex gap-2 flex-wrap">
                 <a href="/admin/works/{{.Work.ID}}/edit" class="btn btn-surface btn-sm">✏️ Edit Work</a>
+                <button hx-post="/admin/works/{{.Work.ID}}/hide" hx-swap="none"
+                        hx-confirm="{{if .Work.Hidden}}Unhide{{else}}Hide{{end}} this work from the catalogue?"
+                        class="btn btn-surface btn-sm">
+                    {{if .Work.Hidden}}👁️ Unhide{{else}}🙈 Hide{{end}}
+                </button>
+                {{if .Work.Hidden}}<span class="badge bg-surface text-text-muted">Hidden</span>{{end}}
             </div>
         {{end}}{{end}}
     </div>
