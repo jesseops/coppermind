@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -15,7 +16,10 @@ import (
 
 func (s *Server) handleShelves(w http.ResponseWriter, r *http.Request) {
 	user := auth.UserFromContext(r.Context())
-	shelves, _ := s.store.ListShelves(user.ID)
+	shelves, err := s.store.ListShelves(user.ID)
+	if err != nil {
+		slog.Error("list shelves", "user_id", user.ID, "err", err)
+	}
 	s.render(w, r, "shelves.html", templateData{"Shelves": shelves})
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -40,7 +41,12 @@ func (s *Server) safePath(path string) (string, error) {
 // ── Public handlers ─────────────────────────────────────────────────
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	libs, _ := s.store.ListLibraries()
+	libs, err := s.store.ListLibraries()
+	if err != nil {
+		slog.Error("list libraries", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	if len(libs) == 0 {
 		s.render(w, r, "home.html", templateData{"Works": nil, "Total": 0})
 		return
@@ -54,7 +60,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	offset := (page - 1) * limit
 
-	works, total, _ := s.store.ListWorks(store.WorkFilter{
+	works, total, err := s.store.ListWorks(store.WorkFilter{
 		LibraryID: libs[0].ID,
 		Query:     query,
 		SortBy:    r.URL.Query().Get("sort"),
@@ -63,6 +69,11 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		Limit:     limit,
 		Offset:    offset,
 	})
+	if err != nil {
+		slog.Error("list works", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
 	totalPages := (total + limit - 1) / limit
 
@@ -92,7 +103,10 @@ func (s *Server) handleWorkDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	editions, _ := s.store.ListEditions(id)
+	editions, err := s.store.ListEditions(id)
+	if err != nil {
+		slog.Error("list editions", "work_id", id, "err", err)
+	}
 	tags, _ := s.store.ListTags(id)
 
 	// Collect editions that have their own cover (for admin cover picker).
@@ -112,12 +126,22 @@ func (s *Server) handleWorkDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAuthors(w http.ResponseWriter, r *http.Request) {
-	libs, _ := s.store.ListLibraries()
+	libs, err := s.store.ListLibraries()
+	if err != nil {
+		slog.Error("list libraries", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	if len(libs) == 0 {
 		s.render(w, r, "authors.html", templateData{"Authors": nil})
 		return
 	}
-	authors, _ := s.store.ListAuthors(libs[0].ID)
+	authors, err := s.store.ListAuthors(libs[0].ID)
+	if err != nil {
+		slog.Error("list authors", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	s.render(w, r, "authors.html", templateData{"Authors": authors})
 }
 
@@ -131,7 +155,10 @@ func (s *Server) handleAuthorDetail(w http.ResponseWriter, r *http.Request) {
 	libs, _ := s.store.ListLibraries()
 	var works []domain.Work
 	if len(libs) > 0 {
-		works, _, _ = s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, AuthorID: id})
+		works, _, err = s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, AuthorID: id})
+		if err != nil {
+			slog.Error("list works for author", "author_id", id, "err", err)
+		}
 	}
 	s.render(w, r, "author_detail.html", templateData{
 		"Author": author,
@@ -140,12 +167,22 @@ func (s *Server) handleAuthorDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSeriesList(w http.ResponseWriter, r *http.Request) {
-	libs, _ := s.store.ListLibraries()
+	libs, err := s.store.ListLibraries()
+	if err != nil {
+		slog.Error("list libraries", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	if len(libs) == 0 {
 		s.render(w, r, "series_list.html", templateData{"Series": nil})
 		return
 	}
-	series, _ := s.store.ListSeries(libs[0].ID)
+	series, err := s.store.ListSeries(libs[0].ID)
+	if err != nil {
+		slog.Error("list series", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	s.render(w, r, "series_list.html", templateData{"Series": series})
 }
 
@@ -159,7 +196,10 @@ func (s *Server) handleSeriesDetail(w http.ResponseWriter, r *http.Request) {
 	libs, _ := s.store.ListLibraries()
 	var works []domain.Work
 	if len(libs) > 0 {
-		works, _, _ = s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, SeriesID: id, SortBy: "series"})
+		works, _, err = s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, SeriesID: id, SortBy: "series"})
+		if err != nil {
+			slog.Error("list works for series", "series_id", id, "err", err)
+		}
 	}
 	s.render(w, r, "series_detail.html", templateData{
 		"Series": ser,
@@ -335,7 +375,10 @@ func (s *Server) handlePlayer(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	tracks, _ := s.store.ListTracks(id)
+	tracks, err := s.store.ListTracks(id)
+	if err != nil {
+		slog.Error("list tracks", "edition_id", id, "err", err)
+	}
 	work, _ := s.store.GetWork(edition.WorkID)
 	s.render(w, r, "player.html", templateData{
 		"Work":    work,
@@ -390,7 +433,10 @@ func (s *Server) handleProfile(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCurrentlyReading(w http.ResponseWriter, r *http.Request) {
 	user := auth.UserFromContext(r.Context())
-	states, _ := s.store.ListReadingStates(user.ID, domain.ReadingStatusReading)
+	states, err := s.store.ListReadingStates(user.ID, domain.ReadingStatusReading)
+	if err != nil {
+		slog.Error("list reading states", "user_id", user.ID, "err", err)
+	}
 	s.render(w, r, "reading.html", templateData{"States": states})
 }
 
@@ -466,7 +512,10 @@ func (s *Server) handleAdminEditForm(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	editions, _ := s.store.ListEditions(id)
+	editions, err := s.store.ListEditions(id)
+	if err != nil {
+		slog.Error("list editions for edit", "work_id", id, "err", err)
+	}
 	tags, _ := s.store.ListTags(id)
 	s.render(w, r, "admin_edit.html", templateData{
 		"Work":     work,
@@ -487,18 +536,27 @@ func (s *Server) handleAdminEditSubmit(w http.ResponseWriter, r *http.Request) {
 	if desc != "" {
 		update.Description = &desc
 	}
-	s.store.UpdateWork(id, update)
+	if err := s.store.UpdateWork(id, update); err != nil {
+		slog.Error("update work", "id", id, "err", err)
+	}
 	http.Redirect(w, r, fmt.Sprintf("/works/%d", id), http.StatusSeeOther)
 }
 
 func (s *Server) handleAdminDeleteWork(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	s.store.DeleteWork(id)
+	if err := s.store.DeleteWork(id); err != nil {
+		slog.Error("delete work", "id", id, "err", err)
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
-	users, _ := s.store.ListUsers()
+	users, err := s.store.ListUsers()
+	if err != nil {
+		slog.Error("list users", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	s.render(w, r, "admin_users.html", templateData{"Users": users})
 }
 
@@ -510,8 +568,15 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		role = domain.RoleViewer
 	}
 
-	hash, _ := auth.HashPassword(password)
-	s.store.CreateUser(username, username, hash, role)
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		slog.Error("hash password", "err", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	if _, err := s.store.CreateUser(username, username, hash, role); err != nil {
+		slog.Error("create user", "username", username, "err", err)
+	}
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
