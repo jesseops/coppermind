@@ -493,27 +493,28 @@ func (s *Server) handleAdminReparse(w http.ResponseWriter, r *http.Request) {
 		s.store.UpdateWork(workID, store.WorkUpdate{Title: &meta.Title})
 	}
 
-	// Update authors.
-	if len(meta.Authors) > 0 {
-		oldAuthor := work.PrimaryAuthor()
-		newAuthor := meta.Authors[0]
-		if oldAuthor != newAuthor {
-			changes = append(changes, fmt.Sprintf("author: %q → %q", oldAuthor, newAuthor))
-			// Unlink old authors, link new.
-			oldAuthors, _ := s.store.GetWorkAuthors(workID)
-			for _, oa := range oldAuthors {
-				s.store.UnlinkWorkAuthor(workID, oa.AuthorID, oa.Role)
-			}
-			for _, name := range meta.Authors {
-				sortName := domain.GenerateSortName(name)
-				existing, err := s.store.FindAuthorBySortName(sortName)
-				if err == nil && existing != nil {
-					s.store.LinkWorkAuthor(workID, existing.ID, domain.RoleAuthorOf)
-				} else {
-					created, err := s.store.CreateAuthor(name, sortName)
-					if err == nil {
-						s.store.LinkWorkAuthor(workID, created.ID, domain.RoleAuthorOf)
-					}
+	// Update authors — compare by sort name to avoid format-only differences.
+	if len(meta.Authors) > 0 && reparseAuthorsChanged(work, meta.Authors) {
+		oldNames := make([]string, len(work.Authors))
+		for i, a := range work.Authors {
+			oldNames[i] = a.AuthorName
+		}
+		changes = append(changes, fmt.Sprintf("authors: %q → %q",
+			strings.Join(oldNames, ", "), strings.Join(meta.Authors, ", ")))
+		// Unlink old authors, link new.
+		oldAuthors, _ := s.store.GetWorkAuthors(workID)
+		for _, oa := range oldAuthors {
+			s.store.UnlinkWorkAuthor(workID, oa.AuthorID, oa.Role)
+		}
+		for _, name := range meta.Authors {
+			sortName := domain.GenerateSortName(name)
+			existing, err := s.store.FindAuthorBySortName(sortName)
+			if err == nil && existing != nil {
+				s.store.LinkWorkAuthor(workID, existing.ID, domain.RoleAuthorOf)
+			} else {
+				created, err := s.store.CreateAuthor(name, sortName)
+				if err == nil {
+					s.store.LinkWorkAuthor(workID, created.ID, domain.RoleAuthorOf)
 				}
 			}
 		}
@@ -538,6 +539,28 @@ func (s *Server) handleAdminReparse(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("HX-Trigger", "metadataUpdated")
 	fmt.Fprintf(w, `<span class="text-sm">✓ Updated: %s</span>`, template.HTMLEscapeString(strings.Join(changes, "; ")))
+}
+
+// reparseAuthorsChanged compares authors by sort name to avoid flagging
+// format-only differences like "First Last" vs "Last, First".
+func reparseAuthorsChanged(work *domain.Work, newAuthors []string) bool {
+	oldSet := make(map[string]bool)
+	for _, a := range work.Authors {
+		oldSet[domain.GenerateSortName(a.AuthorName)] = true
+	}
+	newSet := make(map[string]bool)
+	for _, name := range newAuthors {
+		newSet[domain.GenerateSortName(name)] = true
+	}
+	if len(oldSet) != len(newSet) {
+		return true
+	}
+	for k := range newSet {
+		if !oldSet[k] {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {

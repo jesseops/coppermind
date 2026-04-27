@@ -119,7 +119,7 @@ Use --dry-run to preview changes without writing them.`,
 				}
 
 				// Apply author update: unlink old, link new.
-				if len(meta.Authors) > 0 {
+				if len(meta.Authors) > 0 && authorsChanged(&work, meta.Authors) {
 					oldAuthors, _ := s.GetWorkAuthors(work.ID)
 					for _, oa := range oldAuthors {
 						s.UnlinkWorkAuthor(work.ID, oa.AuthorID, oa.Role)
@@ -178,14 +178,42 @@ func describeChanges(work *domain.Work, meta *importer.Extracted) []string {
 	if meta.Title != "" && meta.Title != work.Title {
 		changes = append(changes, fmt.Sprintf("title: %q → %q", work.Title, meta.Title))
 	}
-	if len(meta.Authors) > 0 {
-		oldAuthor := work.PrimaryAuthor()
-		newAuthor := meta.Authors[0]
-		if oldAuthor != newAuthor {
-			changes = append(changes, fmt.Sprintf("author: %q → %q", oldAuthor, newAuthor))
-		}
+	if len(meta.Authors) > 0 && authorsChanged(work, meta.Authors) {
+		old := formatAuthorList(work.Authors)
+		new_ := strings.Join(meta.Authors, ", ")
+		changes = append(changes, fmt.Sprintf("authors: %q → %q", old, new_))
 	}
 	return changes
+}
+
+// authorsChanged returns true if the parsed authors are materially different
+// from the work's current authors (comparing by sort name, not display name).
+func authorsChanged(work *domain.Work, newAuthors []string) bool {
+	oldSet := make(map[string]bool)
+	for _, a := range work.Authors {
+		oldSet[domain.GenerateSortName(a.AuthorName)] = true
+	}
+	newSet := make(map[string]bool)
+	for _, name := range newAuthors {
+		newSet[domain.GenerateSortName(name)] = true
+	}
+	if len(oldSet) != len(newSet) {
+		return true
+	}
+	for k := range newSet {
+		if !oldSet[k] {
+			return true
+		}
+	}
+	return false
+}
+
+func formatAuthorList(authors []domain.WorkAuthor) string {
+	names := make([]string, len(authors))
+	for i, a := range authors {
+		names[i] = a.AuthorName
+	}
+	return strings.Join(names, ", ")
 }
 
 func fileExists(path string) bool {

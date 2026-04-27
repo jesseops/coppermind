@@ -20,7 +20,7 @@ func ExtractMobiMetadata(filePath string) (*Extracted, error) {
 		return nil, fmt.Errorf("mobi record0: %w", err)
 	}
 
-	records, err := parseEXTH(record0)
+	records, allAuthors, err := parseEXTH(record0)
 	if err != nil {
 		return nil, fmt.Errorf("parse EXTH: %w", err)
 	}
@@ -35,23 +35,31 @@ func ExtractMobiMetadata(filePath string) (*Extracted, error) {
 		ext.Title = mobiFullName(record0)
 	}
 
-	author := records[100]
+	// Use all EXTH 100 records for authors (MOBI can have multiple).
+	// Also split on ; and & within each record.
+	if len(allAuthors) > 0 {
+		for _, raw := range allAuthors {
+			for _, a := range strings.FieldsFunc(raw, func(r rune) bool { return r == ';' || r == '&' }) {
+				a = strings.TrimSpace(a)
+				if a != "" {
+					ext.Authors = append(ext.Authors, a)
+				}
+			}
+		}
+	}
 
 	// Old Calibre versions sometimes swap EXTH 100 (author) and 503 (title),
 	// or stuff "Author - Title" into EXTH 503. Detect and fix this.
-	ext.Title, author = fixMobiAuthorTitleSwap(ext.Title, author)
-
-	if author != "" {
-		// MOBI may have multiple authors separated by ; or &
-		for _, a := range strings.Split(author, ";") {
-			a = strings.TrimSpace(a)
-			if a != "" {
-				ext.Authors = append(ext.Authors, a)
-			}
-		}
-		if len(ext.Authors) == 0 {
-			ext.Authors = []string{author}
-		}
+	primaryAuthor := ""
+	if len(ext.Authors) > 0 {
+		primaryAuthor = ext.Authors[0]
+	}
+	ext.Title, primaryAuthor = fixMobiAuthorTitleSwap(ext.Title, primaryAuthor)
+	// If the swap changed the primary author, replace the authors list.
+	if len(ext.Authors) > 0 && primaryAuthor != ext.Authors[0] {
+		ext.Authors = []string{primaryAuthor}
+	} else if len(ext.Authors) == 0 && primaryAuthor != "" {
+		ext.Authors = []string{primaryAuthor}
 	}
 
 	ext.ISBN = extractISBNFromMobi(records)
@@ -150,27 +158,33 @@ func mobiRecord0(data []byte) ([]byte, error) {
 	return data[record0Offset:record1Offset], nil
 }
 
-func parseEXTH(record0 []byte) (map[uint32]string, error) {
+func parseEXTH(record0 []byte) (map[uint32]string, []string, error) {
 	raw, err := parseEXTHRaw(record0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	records := make(map[uint32]string)
-	for key, value := range raw {
-		valueBytes := bytes.Trim(value, "\x00")
-		text := strings.TrimSpace(string(valueBytes))
-		if text == "" {
-			continue
-		}
-		if _, exists := records[key]; !exists {
-			records[key] = text
+	var authors []string
+	for key, values := range raw {
+		for _, value := range values {
+			valueBytes := bytes.Trim(value, "\x00")
+			text := strings.TrimSpace(string(valueBytes))
+			if text == "" {
+				continue
+			}
+			if key == 100 {
+				authors = append(authors, text)
+			}
+			if _, exists := records[key]; !exists {
+				records[key] = text
+			}
 		}
 	}
-	return records, nil
+	return records, authors, nil
 }
 
-func parseEXTHRaw(record0 []byte) (map[uint32][]byte, error) {
-	records := make(map[uint32][]byte)
+func parseEXTHRaw(record0 []byte) (map[uint32][][]byte, error) {
+	records := make(map[uint32][][]byte)
 	start := bytes.Index(record0, []byte("EXTH"))
 	if start == -1 {
 		return records, nil
@@ -193,10 +207,9 @@ func parseEXTHRaw(record0 []byte) (map[uint32][]byte, error) {
 		if recordLen < 8 || offset+recordLen > end {
 			break
 		}
-		valueBytes := record0[offset+8 : offset+recordLen]
-		if _, exists := records[recordType]; !exists {
-			records[recordType] = valueBytes
-		}
+		valueBytes := make([]byte, recordLen-8)
+		copy(valueBytes, record0[offset+8:offset+recordLen])
+		records[recordType] = append(records[recordType], valueBytes)
 		offset += recordLen
 	}
 
@@ -297,10 +310,14 @@ func looksLikePersonName(s string) bool {
 	return true
 }
 
-func mobiCoverRecordIndex(records map[uint32][]byte) int {
+func mobiCoverRecordIndex(records map[uint32][][]byte) int {
 	for _, key := range []uint32{201, 202} {
-		raw, ok := records[key]
-		if !ok || len(raw) < 4 {
+		raws, ok := records[key]
+		if !ok || len(raws) == 0 {
+			continue
+		}
+		raw := raws[0]
+		if len(raw) < 4 {
 			continue
 		}
 		index := int(binary.BigEndian.Uint32(raw[:4]))
