@@ -726,8 +726,8 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 		total = len(filtered)
 	}
 
-	// Count per issue for the sidebar (respecting format filter).
-	allWorks, _, _ := s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, IncludeHidden: true, Format: format})
+	// Count per issue for the sidebar (respecting format and hidden filters).
+	allWorks, _, _ := s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, IncludeHidden: showHidden, Format: format})
 	counts := map[string]int{}
 	for _, w := range allWorks {
 		if !w.HasCover() {
@@ -739,6 +739,10 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 		if w.Description == "" {
 			counts["no-description"]++
 		}
+	}
+	// Hidden count always queries all works (regardless of showHidden toggle).
+	allWithHidden, _, _ := s.store.ListWorks(store.WorkFilter{LibraryID: libs[0].ID, IncludeHidden: true, Format: format})
+	for _, w := range allWithHidden {
 		if w.Hidden {
 			counts["hidden"]++
 		}
