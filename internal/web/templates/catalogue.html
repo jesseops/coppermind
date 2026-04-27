@@ -100,7 +100,7 @@
         <a href="/works/{{.ID}}" class="no-underline text-inherit">
             <div class="cover">
                 {{if .HasCover}}
-                    <img data-src="/covers/{{.ID}}" alt="{{.Title}}" class="lazy">
+                    <img data-src="/covers/{{.ID}}?v={{.UpdatedAt.Unix}}" alt="{{.Title}}" class="lazy">
                 {{else}}
                     {{coverInitials .Title}}
                 {{end}}
@@ -168,7 +168,7 @@
         {{range .Works}}
         <tr class="hover:bg-surface-hover transition">
             <td>
-                {{if .HasCover}}<img data-src="/covers/{{.ID}}" class="w-8 h-10 object-cover rounded lazy">
+                {{if .HasCover}}<img data-src="/covers/{{.ID}}?v={{.UpdatedAt.Unix}}" class="w-8 h-10 object-cover rounded lazy">
                 {{else}}<div class="w-8 h-10 bg-surface rounded flex items-center justify-center text-xs text-text-muted">{{coverInitials .Title}}</div>{{end}}
             </td>
             <td><a href="/works/{{.ID}}" class="font-medium">{{.Title}}</a></td>
