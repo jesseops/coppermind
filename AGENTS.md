@@ -61,16 +61,28 @@ To add a theme: define a new `[data-theme="<name>"]` block in `input.css` with a
 ## Things That Don't Exist Yet (Intentionally)
 
 - **Format conversion** — No EPUB→MOBI (KindleGen is discontinued). Modern Kindles read EPUB.
-- **External metadata lookup** — Open Library, Google Books APIs are future work.
 - **Full-text search** — Only metadata search is implemented.
 - **PDF reader** — PDFs can be downloaded but not read in-browser.
 - **Migration from v1** — No data migration tool from the old `items` table schema.
 
+## Security Features
+
+- **Nonce-based CSP** — Every rendered page gets a unique nonce in CSP header. No `'unsafe-inline'` for scripts.
+- **Path traversal guard** — All file-serving handlers validate paths are within `config.DataDir`.
+- **SSRF protection** — Cover downloads only fetch from whitelisted domains (`covers.openlibrary.org`).
+- **Login rate limiting** — 5 attempts per 60s per IP. Returns 429 with Retry-After.
+- **AllowGuests gate** — When `AllowGuests=false`, all routes (except login/setup/health/static/receive) require auth.
+- **HTTP Basic Auth** — Supported for API/OPDS clients (KOReader, etc.) via `OptionalAuth` middleware.
+- **Shelf ownership** — Shelf mutations verify the shelf belongs to the requesting user.
+- **HTMX CSRF** — Global `hx-headers` on body auto-includes X-CSRF-Token on all HTMX requests.
+
 ## Testing
 
 Run `make test`. Store tests use in-memory SQLite (`:memory:`). Importer tests generate
-synthetic EPUBs programmatically (see `createTestEpub` in `epub_test.go`). There are no
-real EPUB/MOBI fixtures checked in.
+synthetic EPUBs programmatically (see `createTestEpub` in `epub_test.go`). Web handler
+integration tests (`web_test.go`) use `httptest.NewServer` with in-memory store and
+cookie jars — they verify auth flows, CSRF, admin gating, rate limiting, and template
+rendering. There are no real EPUB/MOBI fixtures checked in.
 
 ## File Layout Conventions
 
