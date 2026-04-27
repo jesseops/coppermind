@@ -687,6 +687,8 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	format := r.URL.Query().Get("format")
 
+	showHidden := r.URL.Query().Get("show_hidden") == "1"
+
 	filter := store.WorkFilter{
 		LibraryID: libs[0].ID,
 		Query:     q,
@@ -697,18 +699,17 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 	switch issue {
 	case "no-cover":
 		filter.MissingCover = true
-		filter.IncludeHidden = true
+		filter.IncludeHidden = showHidden
 	case "no-author":
 		filter.MissingAuthor = true
-		filter.IncludeHidden = true
+		filter.IncludeHidden = showHidden
 	case "no-description":
 		filter.MissingDesc = true
-		filter.IncludeHidden = true
+		filter.IncludeHidden = showHidden
 	case "hidden":
 		filter.OnlyHidden = true
 	default:
-		// "all issues" — show everything that has at least one problem
-		filter.IncludeHidden = true
+		filter.IncludeHidden = showHidden
 	}
 
 	works, total, _ := s.store.ListWorks(filter)
@@ -744,12 +745,13 @@ func (s *Server) handleAdminLibrarian(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := templateData{
-		"Works":  works,
-		"Total":  total,
-		"Issue":  issue,
-		"Query":  q,
-		"Format": format,
-		"Counts": counts,
+		"Works":      works,
+		"Total":      total,
+		"Issue":      issue,
+		"Query":      q,
+		"Format":     format,
+		"ShowHidden": showHidden,
+		"Counts":     counts,
 	}
 
 	s.render(w, r, "admin_librarian.html", data)
