@@ -40,6 +40,14 @@ func (s *Server) handleShelfDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// Private shelves require ownership.
+	if !shelf.IsPublic {
+		user := auth.UserFromContext(r.Context())
+		if user == nil || user.ID != shelf.UserID {
+			http.NotFound(w, r)
+			return
+		}
+	}
 	works, _ := s.store.ListShelfWorks(id)
 	s.render(w, r, "shelf.html", templateData{
 		"Shelf": shelf,
@@ -48,14 +56,26 @@ func (s *Server) handleShelfDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAddToShelf(w http.ResponseWriter, r *http.Request) {
+	user := auth.UserFromContext(r.Context())
 	shelfID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	shelf, err := s.store.GetShelf(shelfID)
+	if err != nil || shelf.UserID != user.ID {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 	workID, _ := strconv.ParseInt(r.FormValue("work_id"), 10, 64)
 	s.store.AddToShelf(shelfID, workID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleRemoveFromShelf(w http.ResponseWriter, r *http.Request) {
+	user := auth.UserFromContext(r.Context())
 	shelfID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	shelf, err := s.store.GetShelf(shelfID)
+	if err != nil || shelf.UserID != user.ID {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 	workID, _ := strconv.ParseInt(r.FormValue("work_id"), 10, 64)
 	s.store.RemoveFromShelf(shelfID, workID)
 	w.WriteHeader(http.StatusNoContent)
@@ -157,8 +177,8 @@ func (s *Server) registerUserRoutes(r chi.Router) {
 		r.Post("/me/rate/{id}", s.handleRate)
 		r.Post("/me", s.handleUpdateProfile)
 		r.Post("/send/{id}", s.handleSendToKindle)
+		r.Post("/shelves/{id}/add", s.handleAddToShelf)
+		r.Post("/shelves/{id}/remove", s.handleRemoveFromShelf)
 	})
 	r.Get("/shelves/{id}", s.handleShelfDetail)
-	r.Post("/shelves/{id}/add", s.handleAddToShelf)
-	r.Post("/shelves/{id}/remove", s.handleRemoveFromShelf)
 }

@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	html "html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -16,6 +17,28 @@ import (
 	"github.com/jesseops/coppermind/internal/auth"
 	"github.com/jesseops/coppermind/internal/store"
 )
+
+// allowedCoverHosts is the whitelist of domains we'll fetch cover images from.
+var allowedCoverHosts = []string{
+	"covers.openlibrary.org",
+}
+
+// isAllowedCoverURL validates a URL against the cover host whitelist.
+func isAllowedCoverURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "https" {
+		return false
+	}
+	for _, h := range allowedCoverHosts {
+		if u.Host == h {
+			return true
+		}
+	}
+	return false
+}
 
 // CoverSearchResult represents a single cover art candidate.
 type CoverSearchResult struct {
@@ -76,13 +99,6 @@ func searchOpenLibrary(query, author, isbn string) ([]CoverSearchResult, error) 
 	}
 
 	seen := make(map[int]bool)
-	// Mark ISBN-based result as seen to avoid duplicates.
-	for _, r := range results {
-		if r.CoverURL != "" {
-			// Extract cover ID from URL if possible — just dedupe by ISBN.
-		}
-		_ = r
-	}
 
 	for _, doc := range data.Docs {
 		if doc.CoverI == 0 || seen[doc.CoverI] {
@@ -145,7 +161,12 @@ func fetchOpenLibraryByISBN(isbn string) (*CoverSearchResult, error) {
 }
 
 // downloadCover downloads a cover image URL and saves it to the data dir.
+// Only fetches from whitelisted domains (SSRF protection).
 func (s *Server) downloadCover(coverURL string, workID int64) (string, error) {
+	if !isAllowedCoverURL(coverURL) {
+		return "", fmt.Errorf("URL not in allowed cover sources: %s", coverURL)
+	}
+
 	resp, err := httpClient.Get(coverURL)
 	if err != nil {
 		return "", fmt.Errorf("download cover: %w", err)
@@ -272,17 +293,22 @@ func (s *Server) handleAdminCoverSearch(w http.ResponseWriter, r *http.Request) 
 
 	fmt.Fprintf(w, `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:1rem;padding:0.5rem;">`)
 	for _, res := range results {
+		// Skip results with non-whitelisted URLs.
+		if !isAllowedCoverURL(res.ThumbURL) || !isAllowedCoverURL(res.CoverURL) {
+			continue
+		}
+		title := html.EscapeString(res.Title)
 		fmt.Fprintf(w, `<div style="text-align:center;">`)
 		fmt.Fprintf(w, `<img src="%s" alt="%s" style="max-width:120px;max-height:180px;border-radius:0.25rem;border:1px solid var(--color-border);cursor:pointer;"
-			loading="lazy">`, res.ThumbURL, res.Title)
-		fmt.Fprintf(w, `<div style="font-size:0.75rem;margin-top:0.25rem;color:var(--color-text-muted);line-height:1.2;">%s`, res.Title)
+			loading="lazy">`, res.ThumbURL, title)
+		fmt.Fprintf(w, `<div style="font-size:0.75rem;margin-top:0.25rem;color:var(--color-text-muted);line-height:1.2;">%s`, title)
 		if res.Year > 0 {
 			fmt.Fprintf(w, ` (%d)`, res.Year)
 		}
 		fmt.Fprintf(w, `</div>`)
 		fmt.Fprintf(w, `<form hx-post="/admin/works/%d/covers/apply" hx-target="#cover-status" hx-swap="innerHTML" style="margin-top:0.25rem;">`, id)
-		fmt.Fprintf(w, `<input type="hidden" name="csrf_token" value="%s">`, auth.CSRFToken(r))
-		fmt.Fprintf(w, `<input type="hidden" name="url" value="%s">`, res.CoverURL)
+		fmt.Fprintf(w, `<input type="hidden" name="csrf_token" value="%s">`, html.EscapeString(auth.CSRFToken(r)))
+		fmt.Fprintf(w, `<input type="hidden" name="url" value="%s">`, html.EscapeString(res.CoverURL))
 		fmt.Fprintf(w, `<button type="submit" class="btn btn-primary btn-sm">Use</button>`)
 		fmt.Fprintf(w, `</form>`)
 		fmt.Fprintf(w, `</div>`)

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jesseops/coppermind/internal/auth"
@@ -15,6 +16,26 @@ import (
 	"github.com/jesseops/coppermind/internal/importer"
 	"github.com/jesseops/coppermind/internal/store"
 )
+
+// safePath validates that a file path is within the server's data directory.
+// Returns the cleaned absolute path, or an error if it escapes the data dir.
+func (s *Server) safePath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty path")
+	}
+	cleaned := filepath.Clean(path)
+	dataDir := filepath.Clean(s.config.DataDir)
+
+	// Handle both absolute and relative paths.
+	if !filepath.IsAbs(cleaned) {
+		cleaned = filepath.Join(dataDir, cleaned)
+	}
+
+	if !strings.HasPrefix(cleaned, dataDir+string(filepath.Separator)) && cleaned != dataDir {
+		return "", fmt.Errorf("path %q is outside data directory", path)
+	}
+	return cleaned, nil
+}
 
 // ── Public handlers ─────────────────────────────────────────────────
 
@@ -153,8 +174,13 @@ func (s *Server) handleCover(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	safe, err := s.safePath(work.CoverPath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	http.ServeFile(w, r, work.CoverPath)
+	http.ServeFile(w, r, safe)
 }
 
 func (s *Server) handleEditionCover(w http.ResponseWriter, r *http.Request) {
@@ -164,8 +190,13 @@ func (s *Server) handleEditionCover(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	safe, err := s.safePath(edition.CoverPath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	http.ServeFile(w, r, edition.CoverPath)
+	http.ServeFile(w, r, safe)
 }
 
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
@@ -175,8 +206,13 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(edition.FilePath)))
-	http.ServeFile(w, r, edition.FilePath)
+	safe, err := s.safePath(edition.FilePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(safe)))
+	http.ServeFile(w, r, safe)
 }
 
 // ── Auth handlers ───────────────────────────────────────────────────
@@ -260,9 +296,14 @@ func (s *Server) handleReader(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	safe, err := s.safePath(edition.FilePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	chapter, _ := strconv.Atoi(r.URL.Query().Get("chapter"))
 
-	chapterHTML, chapterPath, chapters, err := importer.ExtractEpubChapter(edition.FilePath, chapter)
+	chapterHTML, chapterPath, chapters, err := importer.ExtractEpubChapter(safe, chapter)
 	if err != nil {
 		http.Error(w, "Failed to read chapter", http.StatusInternalServerError)
 		return
@@ -302,8 +343,13 @@ func (s *Server) handleEpubAsset(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	safe, err := s.safePath(edition.FilePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
 	assetPath := chi.URLParam(r, "*")
-	data, err := importer.ExtractEpubAsset(edition.FilePath, assetPath)
+	data, err := importer.ExtractEpubAsset(safe, assetPath)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -319,7 +365,12 @@ func (s *Server) handleAudioTrack(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, track.FilePath)
+	safe, err := s.safePath(track.FilePath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, safe)
 }
 
 // ── User handlers ───────────────────────────────────────────────────
