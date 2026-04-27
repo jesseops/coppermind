@@ -8,6 +8,21 @@ import (
 	"strings"
 )
 
+// EXTH record type constants per MobileRead wiki spec.
+const (
+	exthAuthor         = 100 // dc:Creator — can appear multiple times
+	exthPublisher      = 101 // dc:Publisher
+	exthDescription    = 103 // dc:Description
+	exthISBN           = 104 // dc:Identifier scheme='ISBN'
+	exthSubject        = 105 // dc:Subject — can appear multiple times
+	exthPublishingDate = 106 // dc:Date (publication date)
+	exthContributor    = 108 // dc:Contributor
+	exthCoverOffset    = 201 // offset from first image record
+	exthThumbOffset    = 202 // offset from first image record
+	exthUpdatedTitle   = 503 // overrides PalmDB/MOBI full name
+	exthLanguage       = 524 // dc:language
+)
+
 // ExtractMobiMetadata extracts metadata and cover from a MOBI file.
 func ExtractMobiMetadata(filePath string) (*Extracted, error) {
 	data, err := os.ReadFile(filePath)
@@ -20,67 +35,85 @@ func ExtractMobiMetadata(filePath string) (*Extracted, error) {
 		return nil, fmt.Errorf("mobi record0: %w", err)
 	}
 
-	records, allAuthors, err := parseEXTH(record0)
+	records, allByType, err := parseEXTH(record0)
 	if err != nil {
 		return nil, fmt.Errorf("parse EXTH: %w", err)
 	}
 
 	ext := &Extracted{
-		Title:  records[503],
 		Format: "mobi",
 	}
 
-	// EXTH 503 may be missing; fall back to the MOBI header full name.
+	// ── Title: EXTH 503 > MOBI full name > PalmDB name ──
+	ext.Title = records[exthUpdatedTitle]
 	if ext.Title == "" {
 		ext.Title = mobiFullName(record0)
 	}
 
-	// Use all EXTH 100 records for authors (MOBI can have multiple).
-	// Also split on ; and & within each record.
-	if len(allAuthors) > 0 {
-		for _, raw := range allAuthors {
-			for _, a := range strings.FieldsFunc(raw, func(r rune) bool { return r == ';' || r == '&' }) {
-				a = strings.TrimSpace(a)
-				if a != "" {
-					ext.Authors = append(ext.Authors, a)
-				}
+	// ── Authors: all EXTH 100 records, split on ; and & ──
+	for _, raw := range allByType[exthAuthor] {
+		for _, a := range strings.FieldsFunc(raw, func(r rune) bool { return r == ';' || r == '&' }) {
+			a = strings.TrimSpace(a)
+			if a != "" {
+				ext.Authors = append(ext.Authors, a)
 			}
 		}
 	}
 
-	// Old Calibre versions sometimes swap EXTH 100 (author) and 503 (title),
-	// or stuff "Author - Title" into EXTH 503. Detect and fix this.
+	// Old Calibre versions sometimes swap EXTH 100 (author) and 503 (title).
 	primaryAuthor := ""
 	if len(ext.Authors) > 0 {
 		primaryAuthor = ext.Authors[0]
 	}
 	ext.Title, primaryAuthor = fixMobiAuthorTitleSwap(ext.Title, primaryAuthor)
-	// If the swap changed the primary author, replace the authors list.
 	if len(ext.Authors) > 0 && primaryAuthor != ext.Authors[0] {
 		ext.Authors = []string{primaryAuthor}
 	} else if len(ext.Authors) == 0 && primaryAuthor != "" {
 		ext.Authors = []string{primaryAuthor}
 	}
 
-	ext.ISBN = extractISBNFromMobi(records)
+	// ── Publisher: EXTH 101 ──
+	ext.Publisher = records[exthPublisher]
 
-	// Extract cover.
+	// ── Description: EXTH 103 ──
+	ext.Description = cleanDescription(records[exthDescription])
+
+	// ── ISBN: EXTH 104 first, then scan all records for ISBN pattern ──
+	if isbn := normalizeISBN(records[exthISBN]); isbn != "" {
+		ext.ISBN = isbn
+	} else {
+		ext.ISBN = extractISBNFromMobi(records)
+	}
+
+	// ── Published date: EXTH 106 ──
+	if dateStr := records[exthPublishingDate]; dateStr != "" {
+		ext.PublishedYear = extractYear([]string{dateStr})
+	}
+
+	// ── Language: EXTH 524 ──
+	ext.Language = records[exthLanguage]
+
+	// ── Subjects: all EXTH 105 records ──
+	for _, raw := range allByType[exthSubject] {
+		s := strings.TrimSpace(raw)
+		if s != "" {
+			ext.Subjects = append(ext.Subjects, s)
+		}
+	}
+
+	// ── Cover image ──
 	// EXTH 201/202 stores the cover image offset relative to the first image record.
-	// The first image record index is at byte 108 of the MOBI header in record 0.
-	raw, err := parseEXTHRaw(record0)
-	if err == nil {
-		firstImageRecord := mobiFirstImageRecord(record0)
-		coverOffset := mobiCoverOffset(raw)
-		if firstImageRecord >= 0 && coverOffset >= 0 {
-			recordIndex := firstImageRecord + coverOffset
-			start, end, err := mobiRecordOffset(data, recordIndex)
-			if err == nil && start < end && int(end) <= len(data) {
-				cover := data[start:end]
-				// Validate it's actually an image (not HTML or other data).
-				if isImageData(cover) {
-					ext.CoverData = cover
-					ext.CoverExt = detectImageExt(cover)
-				}
+	rawRecords, _ := parseEXTHRaw(record0)
+	firstImageRecord := mobiFirstImageRecord(record0)
+	coverOffset := mobiCoverOffset(rawRecords)
+	if firstImageRecord >= 0 && coverOffset >= 0 {
+		recordIndex := firstImageRecord + coverOffset
+		start, end, err := mobiRecordOffset(data, recordIndex)
+		if err == nil && start < end && int(end) <= len(data) {
+			cover := data[start:end]
+			if isImageData(cover) {
+				ext.CoverData = cover
+				ext.CoverExt = detectImageExt(cover)
 			}
 		}
 	}
@@ -167,13 +200,13 @@ func mobiRecord0(data []byte) ([]byte, error) {
 	return data[record0Offset:record1Offset], nil
 }
 
-func parseEXTH(record0 []byte) (map[uint32]string, []string, error) {
+func parseEXTH(record0 []byte) (map[uint32]string, map[uint32][]string, error) {
 	raw, err := parseEXTHRaw(record0)
 	if err != nil {
 		return nil, nil, err
 	}
 	records := make(map[uint32]string)
-	var authors []string
+	allByType := make(map[uint32][]string)
 	for key, values := range raw {
 		for _, value := range values {
 			valueBytes := bytes.Trim(value, "\x00")
@@ -181,15 +214,13 @@ func parseEXTH(record0 []byte) (map[uint32]string, []string, error) {
 			if text == "" {
 				continue
 			}
-			if key == 100 {
-				authors = append(authors, text)
-			}
+			allByType[key] = append(allByType[key], text)
 			if _, exists := records[key]; !exists {
 				records[key] = text
 			}
 		}
 	}
-	return records, authors, nil
+	return records, allByType, nil
 }
 
 func parseEXTHRaw(record0 []byte) (map[uint32][][]byte, error) {

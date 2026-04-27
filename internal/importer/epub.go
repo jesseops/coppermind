@@ -30,6 +30,7 @@ type opfPackage struct {
 type opfMetadata struct {
 	Titles       []string        `xml:"title"`
 	Creators     []string        `xml:"creator"`
+	Subjects     []string        `xml:"subject"`
 	Identifiers  []opfIdentifier `xml:"identifier"`
 	Dates        []string        `xml:"date"`
 	Languages    []string        `xml:"language"`
@@ -95,6 +96,7 @@ func ExtractEpubMetadata(filePath string) (*Extracted, error) {
 		Language:      firstNonEmpty(opf.Metadata.Languages),
 		Publisher:     firstNonEmpty(opf.Metadata.Publishers),
 		Description:   cleanDescription(firstNonEmpty(opf.Metadata.Descriptions)),
+		Subjects:      nonEmptyStrings(opf.Metadata.Subjects),
 		Format:        "epub",
 	}
 

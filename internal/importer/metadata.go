@@ -11,6 +11,7 @@ type Extracted struct {
 	Language      string
 	Publisher     string
 	Description   string
+	Subjects      []string // genre/category tags
 	Format        string   // "epub", "mobi", "mp3", "m4b", "pdf"
 	CoverData     []byte
 	CoverExt      string   // ".jpg", ".png", etc.
