@@ -8,11 +8,16 @@
 <div class="search-bar">
     <input type="search" name="q" value="{{.Query}}" placeholder="Search works..."
            hx-get="/" hx-trigger="keyup changed delay:300ms" hx-target="#works-grid"
-           hx-push-url="true" hx-include="[name='type']">
-    <select name="type" hx-get="/" hx-trigger="change" hx-target="#works-grid" hx-include="[name='q']">
+           hx-push-url="true" hx-include="[name='type'],[name='sort']">
+    <select name="type" hx-get="/" hx-trigger="change" hx-target="#works-grid" hx-include="[name='q'],[name='sort']">
         <option value="">All</option>
         <option value="ebook">Ebooks</option>
         <option value="audiobook">Audiobooks</option>
+    </select>
+    <select name="sort" hx-get="/" hx-trigger="change" hx-target="#works-grid" hx-include="[name='q'],[name='type']">
+        <option value="">Recent</option>
+        <option value="title">Title</option>
+        <option value="year">Year</option>
     </select>
 </div>
 

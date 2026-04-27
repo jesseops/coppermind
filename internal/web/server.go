@@ -3,7 +3,9 @@ package web
 import (
 	"compress/gzip"
 	"context"
+	cryptoRand "crypto/rand"
 	"embed"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"html/template"
@@ -157,6 +159,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Run starts the HTTP server with graceful shutdown.
 func (s *Server) Run() error {
+	// Warn if session secret was auto-generated (won't survive restarts).
+	if os.Getenv("COPPERMIND_SESSION_SECRET") == "" {
+		slog.Warn("no COPPERMIND_SESSION_SECRET set — sessions will not survive restarts")
+	}
+
 	addr := s.config.Addr()
 	httpServer := &http.Server{
 		Addr:              addr,
@@ -209,6 +216,9 @@ func (s *Server) buildRouter() chi.Router {
 	r.Use(auth.OptionalAuth(s.store, s.secret))
 	r.Use(s.guestGateMiddleware)
 	r.Use(s.setupCheckMiddleware)
+
+	// Health check (no auth, no CSRF).
+	r.Get("/health", s.handleHealth)
 
 	// Static files (no CSRF needed).
 	staticRoot, _ := fs.Sub(staticFS, "static")
@@ -352,6 +362,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 	data["CSRFToken"] = auth.CSRFToken(r)
 	data["CurrentUser"] = auth.UserFromContext(r.Context())
 	data["Config"] = s.config
+	data["Nonce"] = generateNonce()
 
 	tpl, ok := s.pages[name]
 	if !ok {
@@ -360,6 +371,13 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 		return
 	}
 
+	// Set CSP header with nonce.
+	nonce := data["Nonce"].(string)
+	csp := fmt.Sprintf(
+		"default-src 'self'; script-src 'self' 'nonce-%s'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https://covers.openlibrary.org data:; connect-src 'self'",
+		nonce,
+	)
+	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tpl.ExecuteTemplate(w, "base", data); err != nil {
 		slog.Error("render template", "name", name, "err", err)
@@ -451,4 +469,21 @@ func coverInitials(title string) string {
 	r1 := []rune(words[0])
 	r2 := []rune(words[1])
 	return strings.ToUpper(string(r1[0:1]) + string(r2[0:1]))
+}
+
+// generateNonce creates a random base64 nonce for CSP.
+func generateNonce() string {
+	b := make([]byte, 16)
+	io.ReadFull(cryptoRand.Reader, b)
+	return base64.StdEncoding.EncodeToString(b)
+}
+
+// handleHealth is a simple liveness check.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if err := s.store.(*store.SQLiteStore).DB().Ping(); err != nil {
+		http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("ok"))
 }
