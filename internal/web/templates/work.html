@@ -51,15 +51,22 @@
 {{if .CurrentUser}}{{if .CurrentUser.IsAdmin}}
 <div class="mt-6 p-4 border border-border rounded-md bg-surface space-y-4">
     <h3 class="mt-0 text-base">🔍 Metadata Lookup</h3>
-    <form hx-get="/admin/works/{{.Work.ID}}/metadata/search"
-          hx-target="#metadata-results"
-          hx-swap="innerHTML"
-          hx-indicator="#metadata-spinner"
-          class="flex gap-2 items-center">
-        <input type="text" name="q" value="{{.Work.Title}}" placeholder="Search title, author, or ISBN..." class="flex-1">
-        <button type="submit" class="btn btn-primary btn-sm">Search Metadata</button>
-        <span id="metadata-spinner" class="htmx-indicator text-sm text-text-muted">Searching...</span>
-    </form>
+    <div class="flex gap-2 items-center flex-wrap">
+        <form hx-get="/admin/works/{{.Work.ID}}/metadata/search"
+              hx-target="#metadata-results"
+              hx-swap="innerHTML"
+              hx-indicator="#metadata-spinner"
+              class="flex gap-2 items-center flex-1">
+            <input type="text" name="q" value="{{.Work.Title}}" placeholder="Search title, author, or ISBN..." class="flex-1">
+            <button type="submit" class="btn btn-primary btn-sm">Search Metadata</button>
+            <span id="metadata-spinner" class="htmx-indicator text-sm text-text-muted">Searching...</span>
+        </form>
+        <button hx-post="/admin/works/{{.Work.ID}}/reparse"
+                hx-target="#metadata-status"
+                hx-swap="innerHTML"
+                hx-confirm="Re-extract metadata from the source file?"
+                class="btn btn-surface btn-sm">🔄 Reparse from file</button>
+    </div>
     <div id="metadata-results"></div>
     <div id="metadata-status"></div>
 

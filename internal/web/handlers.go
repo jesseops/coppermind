@@ -449,6 +449,97 @@ func (s *Server) handleAdminDeleteWork(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+func (s *Server) handleAdminReparse(w http.ResponseWriter, r *http.Request) {
+	workID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	work, err := s.store.GetWork(workID)
+	if err != nil {
+		fmt.Fprintf(w, `<span class="text-error text-sm">Work not found</span>`)
+		return
+	}
+
+	editions, err := s.store.ListEditions(workID)
+	if err != nil || len(editions) == 0 {
+		fmt.Fprintf(w, `<span class="text-error text-sm">No editions found</span>`)
+		return
+	}
+
+	ed := editions[0]
+	if ed.FilePath == "" {
+		fmt.Fprintf(w, `<span class="text-error text-sm">No file path for edition</span>`)
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(ed.FilePath))
+	var meta *importer.Extracted
+	switch ext {
+	case ".epub":
+		meta, err = importer.ExtractEpubMetadata(ed.FilePath)
+	case ".mobi":
+		meta, err = importer.ExtractMobiMetadata(ed.FilePath)
+	default:
+		fmt.Fprintf(w, `<span class="text-error text-sm">Unsupported format: %s</span>`, ext)
+		return
+	}
+	if err != nil {
+		fmt.Fprintf(w, `<span class="text-error text-sm">Parse error: %s</span>`, template.HTMLEscapeString(err.Error()))
+		return
+	}
+
+	var changes []string
+
+	// Update title.
+	if meta.Title != "" && meta.Title != work.Title {
+		changes = append(changes, fmt.Sprintf("title: %q → %q", work.Title, meta.Title))
+		s.store.UpdateWork(workID, store.WorkUpdate{Title: &meta.Title})
+	}
+
+	// Update authors.
+	if len(meta.Authors) > 0 {
+		oldAuthor := work.PrimaryAuthor()
+		newAuthor := meta.Authors[0]
+		if oldAuthor != newAuthor {
+			changes = append(changes, fmt.Sprintf("author: %q → %q", oldAuthor, newAuthor))
+			// Unlink old authors, link new.
+			oldAuthors, _ := s.store.GetWorkAuthors(workID)
+			for _, oa := range oldAuthors {
+				s.store.UnlinkWorkAuthor(workID, oa.AuthorID, oa.Role)
+			}
+			for _, name := range meta.Authors {
+				sortName := domain.GenerateSortName(name)
+				existing, err := s.store.FindAuthorBySortName(sortName)
+				if err == nil && existing != nil {
+					s.store.LinkWorkAuthor(workID, existing.ID, domain.RoleAuthorOf)
+				} else {
+					created, err := s.store.CreateAuthor(name, sortName)
+					if err == nil {
+						s.store.LinkWorkAuthor(workID, created.ID, domain.RoleAuthorOf)
+					}
+				}
+			}
+		}
+	}
+
+	// Update description if empty.
+	if meta.Description != "" && work.Description == "" {
+		changes = append(changes, "added description")
+		s.store.UpdateWork(workID, store.WorkUpdate{Description: &meta.Description})
+	}
+
+	// Update language if empty.
+	if meta.Language != "" && work.Language == "" {
+		changes = append(changes, "added language")
+		s.store.UpdateWork(workID, store.WorkUpdate{Language: &meta.Language})
+	}
+
+	if len(changes) == 0 {
+		fmt.Fprintf(w, `<span class="text-text-muted text-sm">✓ No changes needed — metadata already matches file.</span>`)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", "metadataUpdated")
+	fmt.Fprintf(w, `<span class="text-sm">✓ Updated: %s</span>`, template.HTMLEscapeString(strings.Join(changes, "; ")))
+}
+
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := s.store.ListUsers()
 	if err != nil {
