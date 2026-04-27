@@ -124,13 +124,15 @@ func ExtractMobiTextPreview(filePath string, maxChars int) (string, error) {
 		if builder.Len() > 0 {
 			builder.WriteString("\n\n")
 		}
-		remaining := maxChars - builder.Len()
-		if remaining <= 0 {
-			break
-		}
-		if len(text) > remaining {
-			builder.WriteString(text[:remaining])
-			break
+		if maxChars > 0 {
+			remaining := maxChars - builder.Len()
+			if remaining <= 0 {
+				break
+			}
+			if len(text) > remaining {
+				builder.WriteString(text[:remaining])
+				break
+			}
 		}
 		builder.WriteString(text)
 	}

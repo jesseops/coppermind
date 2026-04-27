@@ -317,4 +317,12 @@
   }
   .card-action:hover { background: var(--color-surface-hover); text-decoration: none; }
   .card-action-divider { border-top: 1px solid var(--color-border); margin: 0.25rem 0; }
+
+  /* ── EPUB reader content ── */
+  .epub-content img {
+    max-width: 100%; height: auto; display: block; margin: 1rem auto;
+  }
+  .epub-content svg { max-width: 100%; height: auto; }
+  .epub-content table { border-collapse: collapse; max-width: 100%; }
+  .epub-content td, .epub-content th { padding: 0.25rem 0.5rem; border: 1px solid var(--color-border); }
 }

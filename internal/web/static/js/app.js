@@ -68,10 +68,19 @@ document.addEventListener('alpine:init', function () {
                 x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
                 x.setRequestHeader('X-CSRF-Token', csrfToken);
                 x.onload = function () {
-                    alert('Marked as finished!');
                     window.location.href = '/works/' + workID;
                 };
                 x.send(body);
+            },
+            navigatePrev() {
+                if (chapter > 0) {
+                    window.location.href = '/read/' + editionID + '?chapter=' + (chapter - 1);
+                }
+            },
+            navigateNext() {
+                if (chapter < totalChapters - 1) {
+                    window.location.href = '/read/' + editionID + '?chapter=' + (chapter + 1);
+                }
             }
         };
     });

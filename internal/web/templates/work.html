@@ -121,7 +121,11 @@
         </div>
         <div class="flex gap-2 items-center flex-wrap">
             {{if eq .EditionType "ebook"}}
+                {{if eq .Format "pdf"}}
+                <a href="/download/{{.ID}}" class="btn btn-primary btn-sm">Download PDF</a>
+                {{else}}
                 <a href="/read/{{.ID}}" class="btn btn-primary btn-sm">Read</a>
+                {{end}}
             {{else}}
                 <a href="/listen/{{.ID}}" class="btn btn-primary btn-sm">Listen</a>
             {{end}}

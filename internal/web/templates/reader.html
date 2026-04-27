@@ -1,24 +1,41 @@
 {{define "title"}}Reading: {{.Work.Title}} — Coppermind{{end}}
 {{define "content"}}
-<div x-data="readerProgress({{.Edition.ID}}, {{.CurrentCh}}, {{.TotalChapters}}, {{.Work.ID}}, '{{.CSRFToken}}')">
-<div class="my-4 flex items-center gap-4">
-    <a href="/works/{{.Work.ID}}">← {{.Work.Title}}</a>
-    <select x-data="chapterSelect" x-on:change="navigate({{.Edition.ID}}, $event)" class="w-auto">
-        {{range .Chapters}}<option value="{{.Index}}" {{if eq .Index $.CurrentCh}}selected{{end}}>{{.Title}}</option>{{end}}
-    </select>
-    <span class="text-text-muted text-sm ml-auto">Ch {{add .CurrentCh 1}}/{{.TotalChapters}}</span>
+<div x-data="readerProgress({{.Edition.ID}}, {{.CurrentCh}}, {{.TotalChapters}}, {{.Work.ID}}, '{{.CSRFToken}}')"
+     x-on:keydown.left.window="navigatePrev()" x-on:keydown.right.window="navigateNext()">
+
+{{/* ── Sticky top bar ── */}}
+<div class="sticky top-0 z-10 bg-bg border-b border-border py-2 mb-4">
+    <div class="flex items-center gap-4 max-w-[700px] mx-auto px-4">
+        <a href="/works/{{.Work.ID}}" class="text-sm no-underline shrink-0">← Back</a>
+        <select x-data="chapterSelect" x-on:change="navigate({{.Edition.ID}}, $event)" class="w-auto text-sm flex-1 min-w-0">
+            {{range .Chapters}}<option value="{{.Index}}" {{if eq .Index $.CurrentCh}}selected{{end}}>{{.Title}}</option>{{end}}
+        </select>
+        <span class="text-text-muted text-sm shrink-0">{{add .CurrentCh 1}}/{{.TotalChapters}}</span>
+        <div class="flex gap-1 shrink-0">
+            {{if gt .CurrentCh 0}}<a href="/read/{{.Edition.ID}}?chapter={{subtract .CurrentCh 1}}" class="btn btn-sm py-0.5 px-2" title="Previous (←)">←</a>{{end}}
+            {{if lt .CurrentCh (subtract .TotalChapters 1)}}
+            <a href="/read/{{.Edition.ID}}?chapter={{add .CurrentCh 1}}" class="btn btn-sm py-0.5 px-2" title="Next (→)">→</a>
+            {{else}}
+            <button class="btn btn-primary btn-sm py-0.5 px-2" x-on:click="markFinished()" title="Mark as finished">✓</button>
+            {{end}}
+        </div>
+    </div>
 </div>
-<div class="max-w-[700px] mx-auto leading-relaxed text-lg">
+
+{{/* ── Chapter content ── */}}
+<div class="max-w-[700px] mx-auto leading-relaxed text-lg epub-content px-4">
     {{.ChapterHTML}}
 </div>
-<div class="flex justify-between my-8">
-    {{if gt .CurrentCh 0}}<a href="/read/{{.Edition.ID}}?chapter={{subtract .CurrentCh 1}}" class="btn btn-sm">← Previous</a>{{end}}
-    <span></span>
+
+{{/* ── Bottom nav (duplicated for end-of-chapter convenience) ── */}}
+<div class="flex justify-between my-8 max-w-[700px] mx-auto px-4">
+    {{if gt .CurrentCh 0}}<a href="/read/{{.Edition.ID}}?chapter={{subtract .CurrentCh 1}}" class="btn btn-sm">← Previous</a>{{else}}<span></span>{{end}}
     {{if lt .CurrentCh (subtract .TotalChapters 1)}}
     <a href="/read/{{.Edition.ID}}?chapter={{add .CurrentCh 1}}" class="btn btn-sm">Next →</a>
     {{else}}
     <button class="btn btn-primary btn-sm" x-on:click="markFinished()">✓ Mark as finished</button>
     {{end}}
 </div>
+
 </div>
 {{end}}

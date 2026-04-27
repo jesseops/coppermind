@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -209,6 +210,13 @@ func (s *Server) handleReader(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+
+	// PDF: redirect to download (no in-browser reader).
+	if edition.Format == "pdf" {
+		http.Redirect(w, r, fmt.Sprintf("/download/%d", id), http.StatusSeeOther)
+		return
+	}
+
 	safe, err := s.safePath(edition.FilePath)
 	if err != nil {
 		http.NotFound(w, r)
@@ -216,10 +224,41 @@ func (s *Server) handleReader(w http.ResponseWriter, r *http.Request) {
 	}
 	chapter, _ := strconv.Atoi(r.URL.Query().Get("chapter"))
 
-	chapterHTML, chapterPath, chapters, err := importer.ExtractEpubChapter(safe, chapter)
-	if err != nil {
-		http.Error(w, "Failed to read chapter", http.StatusInternalServerError)
-		return
+	var chapterHTML string
+	var chapterPath string
+	var chapters []importer.ReaderChapter
+
+	switch edition.Format {
+	case "mobi":
+		// MOBI: extract full text as a single "chapter".
+		text, err := importer.ExtractMobiTextPreview(safe, 0) // 0 = no limit
+		if err != nil {
+			http.Error(w, "Failed to read MOBI", http.StatusInternalServerError)
+			return
+		}
+		// Convert plain text to HTML paragraphs.
+		var sb strings.Builder
+		for _, line := range strings.Split(text, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				sb.WriteString("<p>")
+				sb.WriteString(template.HTMLEscapeString(line))
+				sb.WriteString("</p>\n")
+			}
+		}
+		chapterHTML = sb.String()
+		chapters = []importer.ReaderChapter{{Index: 0, Title: edition.Format}}
+		chapter = 0
+	default:
+		// EPUB and other formats.
+		var err error
+		chapterHTML, chapterPath, chapters, err = importer.ExtractEpubChapter(safe, chapter)
+		if err != nil {
+			http.Error(w, "Failed to read chapter", http.StatusInternalServerError)
+			return
+		}
+		// Rewrite relative asset URLs in chapter HTML to point to /epub-asset/{id}/...
+		chapterHTML = rewriteEpubAssetURLs(chapterHTML, id, chapterPath)
 	}
 
 	// Auto-set reading state when opening.
@@ -300,6 +339,33 @@ func (s *Server) handleEpubAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "public, max-age=3600")
+	// Set Content-Type based on file extension.
+	switch strings.ToLower(path.Ext(assetPath)) {
+	case ".css":
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	case ".jpg", ".jpeg":
+		w.Header().Set("Content-Type", "image/jpeg")
+	case ".png":
+		w.Header().Set("Content-Type", "image/png")
+	case ".gif":
+		w.Header().Set("Content-Type", "image/gif")
+	case ".svg":
+		w.Header().Set("Content-Type", "image/svg+xml")
+	case ".webp":
+		w.Header().Set("Content-Type", "image/webp")
+	case ".woff", ".woff2":
+		w.Header().Set("Content-Type", "font/woff2")
+	case ".ttf":
+		w.Header().Set("Content-Type", "font/ttf")
+	case ".otf":
+		w.Header().Set("Content-Type", "font/otf")
+	case ".xhtml", ".html", ".htm":
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	case ".xml":
+		w.Header().Set("Content-Type", "application/xml")
+	default:
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
 	w.Write(data)
 }
 
@@ -595,4 +661,92 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAdminDuplicates(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "admin_duplicates.html", nil)
+}
+
+// rewriteEpubAssetURLs rewrites relative src/href attributes in EPUB chapter
+// HTML to point to the /epub-asset/{editionID}/... endpoint.
+func rewriteEpubAssetURLs(html string, editionID int64, chapterPath string) string {
+	base := path.Dir(chapterPath)
+	prefix := fmt.Sprintf("/epub-asset/%d/", editionID)
+
+	rewriteURL := func(url string) string {
+		url = strings.TrimSpace(url)
+		if url == "" || strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") ||
+			strings.HasPrefix(url, "data:") || strings.HasPrefix(url, "/") || strings.HasPrefix(url, "#") {
+			return url
+		}
+		// Strip fragment.
+		frag := ""
+		if i := strings.Index(url, "#"); i >= 0 {
+			frag = url[i:]
+			url = url[:i]
+		}
+		resolved := path.Clean(path.Join(base, url))
+		return prefix + resolved + frag
+	}
+
+	// Rewrite all src="..." attributes (images, etc.).
+	result := rewriteAttrValues(html, `src="`, rewriteURL)
+	result = rewriteAttrValues(result, `src='`, rewriteURL)
+	// Rewrite href="..." only on <link> and <image> tags (CSS, SVG refs), not <a> tags.
+	result = rewriteLinkHrefs(result, rewriteURL)
+	return result
+}
+
+// rewriteAttrValues finds all occurrences of prefix + value + quote and rewrites value.
+func rewriteAttrValues(html, prefix string, fn func(string) string) string {
+	quote := prefix[len(prefix)-1:]
+	var b strings.Builder
+	i := 0
+	for i < len(html) {
+		idx := strings.Index(html[i:], prefix)
+		if idx == -1 {
+			b.WriteString(html[i:])
+			break
+		}
+		b.WriteString(html[i : i+idx])
+		b.WriteString(prefix[:len(prefix)-1]) // write attr= without quote
+		valStart := i + idx + len(prefix)
+		valEnd := strings.Index(html[valStart:], quote)
+		if valEnd == -1 {
+			b.WriteString(html[i+idx+len(prefix)-1:])
+			break
+		}
+		value := html[valStart : valStart+valEnd]
+		b.WriteString(quote)
+		b.WriteString(fn(value))
+		b.WriteString(quote)
+		i = valStart + valEnd + 1
+	}
+	return b.String()
+}
+
+// rewriteLinkHrefs rewrites href attributes only on <link> elements (for CSS).
+func rewriteLinkHrefs(html string, fn func(string) string) string {
+	var b strings.Builder
+	lower := strings.ToLower(html)
+	i := 0
+	for i < len(html) {
+		// Find next <link
+		idx := strings.Index(lower[i:], "<link")
+		if idx == -1 {
+			b.WriteString(html[i:])
+			break
+		}
+		tagStart := i + idx
+		tagEnd := strings.Index(html[tagStart:], ">")
+		if tagEnd == -1 {
+			b.WriteString(html[i:])
+			break
+		}
+		tagEnd += tagStart + 1
+		// Rewrite href inside this tag only.
+		tag := html[tagStart:tagEnd]
+		tag = rewriteAttrValues(tag, `href="`, fn)
+		tag = rewriteAttrValues(tag, `href='`, fn)
+		b.WriteString(html[i:tagStart])
+		b.WriteString(tag)
+		i = tagEnd
+	}
+	return b.String()
 }
