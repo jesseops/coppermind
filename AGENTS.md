@@ -93,3 +93,10 @@ rendering. There are no real EPUB/MOBI fixtures checked in.
   `handlers.go`, `api.go`, `opds_handlers.go`, `user_handlers.go`, `send.go`.
 - `internal/auth/` — Password hashing, session cookies, middleware, CSRF.
 - `cmd/coppermind/` — CLI entry point. One file per command group.
+
+## Git Workflow
+
+**Commit early and often.** Don't accumulate large diffs across multiple features or fixes.
+Commit after each logical unit of work — a bug fix, a new feature, a refactor pass, etc.
+Use the `commit` skill for formatting. If you've made changes and are about to start a new
+task, commit first.
