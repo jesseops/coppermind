@@ -307,7 +307,6 @@ func (s *Server) handleAdminCoverSearch(w http.ResponseWriter, r *http.Request) 
 		}
 		fmt.Fprintf(w, `</div>`)
 		fmt.Fprintf(w, `<form hx-post="/admin/works/%d/covers/apply" hx-target="#cover-status" hx-swap="innerHTML" style="margin-top:0.25rem;">`, id)
-		fmt.Fprintf(w, `<input type="hidden" name="csrf_token" value="%s">`, html.EscapeString(auth.CSRFToken(r)))
 		fmt.Fprintf(w, `<input type="hidden" name="url" value="%s">`, html.EscapeString(res.CoverURL))
 		fmt.Fprintf(w, `<button type="submit" class="btn btn-primary btn-sm">Use</button>`)
 		fmt.Fprintf(w, `</form>`)

@@ -16,7 +16,7 @@
     })();
     </script>
 </head>
-<body>
+<body hx-headers='{"X-CSRF-Token":"{{.CSRFToken}}"}'>
     {{template "nav" .}}
     <main class="container">
         {{block "content" .}}{{end}}

@@ -20,6 +20,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"github.com/jesseops/coppermind/internal/auth"
 	"github.com/jesseops/coppermind/internal/config"
 	"github.com/jesseops/coppermind/internal/importer"
@@ -58,7 +60,7 @@ func NewServer(s store.Store, cfg *config.Config) (*Server, error) {
 	funcs := template.FuncMap{
 		"urlquery":  url.QueryEscape,
 		"lower":     strings.ToLower,
-		"title":     strings.Title,
+		"title":     cases.Title(language.English).String,
 		"hasPrefix": strings.HasPrefix,
 		"csrfToken": func() string { return "" },
 		"currentUser": func() any { return nil },
