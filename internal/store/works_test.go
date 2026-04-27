@@ -93,6 +93,45 @@ func TestListWorksFiltering(t *testing.T) {
 	}
 }
 
+func TestListWorksEnrichment(t *testing.T) {
+	s := newTestStore(t)
+	lib, _ := s.CreateLibrary("Test")
+	series, _ := s.CreateSeries("The Stormlight Archive", "")
+	author, _ := s.CreateAuthor("Brandon Sanderson", "sanderson, brandon")
+
+	w := &domain.Work{LibraryID: lib.ID, Title: "The Way of Kings", SeriesID: series.ID}
+	if err := s.CreateWork(w); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.LinkWorkAuthor(w.ID, author.ID, domain.RoleAuthorOf); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateEdition(&domain.Edition{WorkID: w.ID, EditionType: domain.EditionTypeEbook, Format: domain.FormatEPUB}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateEdition(&domain.Edition{WorkID: w.ID, EditionType: domain.EditionTypeAudiobook, Format: domain.FormatM4B}); err != nil {
+		t.Fatal(err)
+	}
+
+	works, total, err := s.ListWorks(WorkFilter{LibraryID: lib.ID})
+	if err != nil {
+		t.Fatalf("ListWorks: %v", err)
+	}
+	if total != 1 || len(works) != 1 {
+		t.Fatalf("total=%d len=%d, want 1/1", total, len(works))
+	}
+	got := works[0]
+	if got.SeriesName != "The Stormlight Archive" {
+		t.Fatalf("SeriesName = %q", got.SeriesName)
+	}
+	if len(got.Authors) != 1 || got.Authors[0].AuthorName != "Brandon Sanderson" {
+		t.Fatalf("Authors = %+v", got.Authors)
+	}
+	if !got.HasEbook || !got.HasAudiobook || got.EditionCount != 2 {
+		t.Fatalf("edition flags/count wrong: ebook=%v audiobook=%v count=%d", got.HasEbook, got.HasAudiobook, got.EditionCount)
+	}
+}
+
 func TestMergeWorks(t *testing.T) {
 	s := newTestStore(t)
 	lib, _ := s.CreateLibrary("Test")

@@ -60,3 +60,10 @@ func nullOrZeroInt(v int) any {
 	}
 	return v
 }
+
+func placeholders(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strings.TrimRight(strings.Repeat("?,", n), ",")
+}

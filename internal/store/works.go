@@ -358,34 +358,155 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 	}
 	rows.Close()
 
-	// Now populate denormalized fields with the connection free.
-	for i := range works {
-		w := &works[i]
-		authors, _ := s.GetWorkAuthors(w.ID)
-		w.Authors = authors
-		if w.SeriesID > 0 {
-			if ser, err := s.GetSeries(w.SeriesID); err == nil {
-				w.SeriesName = ser.Name
-			}
-		}
-		// Edition type flags.
-		edRows, _ := s.db.Query(
-			"SELECT DISTINCT edition_type FROM editions WHERE work_id = ? AND status = 'active'", w.ID)
-		if edRows != nil {
-			for edRows.Next() {
-				var et string
-				edRows.Scan(&et)
-				if et == domain.EditionTypeEbook {
-					w.HasEbook = true
-				}
-				if et == domain.EditionTypeAudiobook {
-					w.HasAudiobook = true
-				}
-			}
-			edRows.Close()
-		}
+	if err := s.enrichWorks(works); err != nil {
+		return nil, 0, err
 	}
 	return works, total, nil
+}
+
+func (s *SQLiteStore) enrichWorks(works []domain.Work) error {
+	if len(works) == 0 {
+		return nil
+	}
+
+	workIDs := make([]int64, 0, len(works))
+	seriesIDs := make([]int64, 0, len(works))
+	seenSeries := map[int64]bool{}
+	for _, w := range works {
+		workIDs = append(workIDs, w.ID)
+		if w.SeriesID > 0 && !seenSeries[w.SeriesID] {
+			seriesIDs = append(seriesIDs, w.SeriesID)
+			seenSeries[w.SeriesID] = true
+		}
+	}
+
+	authorsByWork, err := s.listAuthorsForWorks(workIDs)
+	if err != nil {
+		return err
+	}
+	seriesNames, err := s.listSeriesNames(seriesIDs)
+	if err != nil {
+		return err
+	}
+	editionStats, err := s.listEditionStatsForWorks(workIDs)
+	if err != nil {
+		return err
+	}
+
+	for i := range works {
+		w := &works[i]
+		w.Authors = authorsByWork[w.ID]
+		w.SeriesName = seriesNames[w.SeriesID]
+		stats := editionStats[w.ID]
+		w.EditionCount = stats.count
+		w.HasEbook = stats.hasEbook
+		w.HasAudiobook = stats.hasAudiobook
+	}
+	return nil
+}
+
+func (s *SQLiteStore) listAuthorsForWorks(workIDs []int64) (map[int64][]domain.WorkAuthor, error) {
+	result := make(map[int64][]domain.WorkAuthor, len(workIDs))
+	if len(workIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(workIDs))
+	for i, id := range workIDs {
+		args[i] = id
+	}
+	rows, err := s.db.Query(`
+		SELECT wa.work_id, wa.author_id, wa.role, a.name
+		FROM work_authors wa
+		JOIN authors a ON a.id = wa.author_id
+		WHERE wa.work_id IN (`+placeholders(len(workIDs))+`)
+		ORDER BY wa.work_id, wa.role, a.sort_name`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var wa domain.WorkAuthor
+		if err := rows.Scan(&wa.WorkID, &wa.AuthorID, &wa.Role, &wa.AuthorName); err != nil {
+			return nil, err
+		}
+		result[wa.WorkID] = append(result[wa.WorkID], wa)
+	}
+	return result, rows.Err()
+}
+
+func (s *SQLiteStore) listSeriesNames(seriesIDs []int64) (map[int64]string, error) {
+	result := make(map[int64]string, len(seriesIDs))
+	if len(seriesIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(seriesIDs))
+	for i, id := range seriesIDs {
+		args[i] = id
+	}
+	rows, err := s.db.Query(`SELECT id, name FROM series WHERE id IN (`+placeholders(len(seriesIDs))+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		result[id] = name
+	}
+	return result, rows.Err()
+}
+
+type editionStats struct {
+	count        int
+	hasEbook     bool
+	hasAudiobook bool
+}
+
+func (s *SQLiteStore) listEditionStatsForWorks(workIDs []int64) (map[int64]editionStats, error) {
+	result := make(map[int64]editionStats, len(workIDs))
+	if len(workIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(workIDs))
+	for i, id := range workIDs {
+		args[i] = id
+	}
+	rows, err := s.db.Query(`
+		SELECT work_id, edition_type, COUNT(*)
+		FROM editions
+		WHERE status = 'active' AND work_id IN (`+placeholders(len(workIDs))+`)
+		GROUP BY work_id, edition_type`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var workID int64
+		var editionType string
+		var count int
+		if err := rows.Scan(&workID, &editionType, &count); err != nil {
+			return nil, err
+		}
+		stats := result[workID]
+		stats.count += count
+		switch editionType {
+		case domain.EditionTypeEbook:
+			stats.hasEbook = true
+		case domain.EditionTypeAudiobook:
+			stats.hasAudiobook = true
+		}
+		result[workID] = stats
+	}
+	return result, rows.Err()
 }
 
 // ── scan helpers ────────────────────────────────────────────────────
