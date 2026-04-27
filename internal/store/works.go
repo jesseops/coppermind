@@ -128,11 +128,7 @@ func (s *SQLiteStore) UpdateWork(id int64, updates WorkUpdate) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("work %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "work", id)
 }
 
 func (s *SQLiteStore) DeleteWork(id int64) error {
@@ -141,11 +137,7 @@ func (s *SQLiteStore) DeleteWork(id int64) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("work %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "work", id)
 }
 
 // MergeWorks moves all editions and relationships from source works into targetID,
@@ -168,7 +160,7 @@ func (s *SQLiteStore) MergeWorks(targetID int64, sourceIDs []int64) error {
 	var targetLibraryID int64
 	if err := tx.QueryRow("SELECT library_id FROM works WHERE id = ?", targetID).Scan(&targetLibraryID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("target work %d not found", targetID)
+			return notFound("target work", targetID)
 		}
 		return err
 	}
@@ -181,7 +173,7 @@ func (s *SQLiteStore) MergeWorks(targetID int64, sourceIDs []int64) error {
 		var sourceLibraryID int64
 		if err := tx.QueryRow("SELECT library_id FROM works WHERE id = ?", sourceID).Scan(&sourceLibraryID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("source work %d not found", sourceID)
+				return notFound("source work", sourceID)
 			}
 			return err
 		}
@@ -403,7 +395,7 @@ func (s *SQLiteStore) scanWork(query string, args ...any) (*domain.Work, error) 
 	w, err := scanWorkFromRow(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("work not found")
+			return nil, notFound("work", "")
 		}
 		return nil, err
 	}

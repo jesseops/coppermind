@@ -128,11 +128,7 @@ func (s *SQLiteStore) UpdateEdition(id int64, updates EditionUpdate) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("edition %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "edition", id)
 }
 
 func (s *SQLiteStore) DeleteEdition(id int64) error {
@@ -140,11 +136,7 @@ func (s *SQLiteStore) DeleteEdition(id int64) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("edition %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "edition", id)
 }
 
 func (s *SQLiteStore) FindEditionByHash(hash string) (*domain.Edition, error) {
@@ -157,7 +149,7 @@ func (s *SQLiteStore) FindEditionByHash(hash string) (*domain.Edition, error) {
 		        cover_path, notes, status, created_at, updated_at
 		 FROM editions WHERE file_hash = ? AND status = 'active' LIMIT 1`, hash)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, ErrNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -183,7 +175,7 @@ func (s *SQLiteStore) scanEdition(query string, args ...any) (*domain.Edition, e
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("edition not found")
+			return nil, notFound("edition", "")
 		}
 		return nil, err
 	}

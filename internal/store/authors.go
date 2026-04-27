@@ -25,7 +25,7 @@ func (s *SQLiteStore) GetAuthor(id int64) (*domain.Author, error) {
 		Scan(&a.ID, &a.Name, &a.SortName, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("author %d not found", id)
+			return nil, notFound("author", id)
 		}
 		return nil, err
 	}

@@ -26,7 +26,7 @@ func (s *SQLiteStore) GetSeries(id int64) (*domain.Series, error) {
 		Scan(&ser.ID, &ser.Name, &desc, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("series %d not found", id)
+			return nil, notFound("series", id)
 		}
 		return nil, err
 	}
