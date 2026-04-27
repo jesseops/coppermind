@@ -30,7 +30,18 @@ func ExtractMobiMetadata(filePath string) (*Extracted, error) {
 		Format: "mobi",
 	}
 
-	if author := records[100]; author != "" {
+	// EXTH 503 may be missing; fall back to the MOBI header full name.
+	if ext.Title == "" {
+		ext.Title = mobiFullName(record0)
+	}
+
+	author := records[100]
+
+	// Old Calibre versions sometimes swap EXTH 100 (author) and 503 (title),
+	// or stuff "Author - Title" into EXTH 503. Detect and fix this.
+	ext.Title, author = fixMobiAuthorTitleSwap(ext.Title, author)
+
+	if author != "" {
 		// MOBI may have multiple authors separated by ; or &
 		for _, a := range strings.Split(author, ";") {
 			a = strings.TrimSpace(a)
@@ -216,6 +227,74 @@ func mobiRecordOffset(data []byte, index int) (uint32, uint32, error) {
 		end = uint32(len(data))
 	}
 	return start, end, nil
+}
+
+// mobiFullName reads the "full name" field from the MOBI header in record 0.
+// This is stored at the offset/length specified at bytes 84-91 of record 0.
+func mobiFullName(record0 []byte) string {
+	if len(record0) < 92 {
+		return ""
+	}
+	nameOffset := binary.BigEndian.Uint32(record0[84:88])
+	nameLen := binary.BigEndian.Uint32(record0[88:92])
+	if nameLen == 0 || int(nameOffset+nameLen) > len(record0) {
+		return ""
+	}
+	return strings.TrimSpace(string(record0[nameOffset : nameOffset+nameLen]))
+}
+
+// fixMobiAuthorTitleSwap detects and corrects cases where EXTH 100 (author)
+// and EXTH 503 (title) are swapped, or where the title field contains a
+// combined "Author - Title" string (common in old Calibre conversions).
+func fixMobiAuthorTitleSwap(title, author string) (string, string) {
+	if title == "" && author == "" {
+		return title, author
+	}
+
+	// Case 1: Title contains "Author - Title" pattern.
+	// The author field often holds the actual title in this case.
+	if parts := strings.SplitN(title, " - ", 2); len(parts) == 2 {
+		candidateAuthor := strings.TrimSpace(parts[0])
+		candidateTitle := strings.TrimSpace(parts[1])
+
+		if candidateAuthor != "" && candidateTitle != "" {
+			// If the EXTH 100 "author" looks like it's actually the title
+			// (matches the title portion of the combined string, or the
+			// combined string's author portion looks like a person name),
+			if looksLikePersonName(candidateAuthor) && !looksLikePersonName(author) {
+				return candidateTitle, candidateAuthor
+			}
+		}
+	}
+
+	// Case 2: Author and title appear simply swapped.
+	// If the "title" looks like a person name and the "author" doesn't.
+	if looksLikePersonName(title) && !looksLikePersonName(author) && author != "" {
+		return author, title
+	}
+
+	return title, author
+}
+
+// looksLikePersonName returns true if the string looks like a person's name
+// (2-4 words, no very long words, no common title articles as first word).
+func looksLikePersonName(s string) bool {
+	words := strings.Fields(s)
+	if len(words) < 2 || len(words) > 5 {
+		return false
+	}
+	// Titles commonly start with articles; names don't.
+	first := strings.ToLower(words[0])
+	if first == "a" || first == "an" || first == "the" {
+		return false
+	}
+	// Each word in a name is typically short and capitalized.
+	for _, w := range words {
+		if len(w) > 20 {
+			return false
+		}
+	}
+	return true
 }
 
 func mobiCoverRecordIndex(records map[uint32][]byte) int {
