@@ -193,20 +193,15 @@ document.addEventListener('alpine:init', function () {
         };
     });
 
-    // ── Work page: HTMX event handlers for cover/metadata refresh ──
+    // ── Work page: auto-refresh on cover/metadata changes ──
     Alpine.data('workPage', function () {
         return {
             init() {
                 document.body.addEventListener('coverUpdated', function () {
-                    var img = document.querySelector('#work-cover img');
-                    if (img) {
-                        img.src = img.src.split('?')[0] + '?v=' + Date.now();
-                    } else {
-                        location.reload();
-                    }
+                    location.reload();
                 });
                 document.body.addEventListener('metadataUpdated', function () {
-                    setTimeout(function () { location.reload(); }, 1500);
+                    location.reload();
                 });
             }
         };
