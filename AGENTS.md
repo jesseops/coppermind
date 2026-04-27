@@ -41,12 +41,22 @@ is persisted.
 - `modernc.org/sqlite` — pure Go SQLite (no CGO). Slower than `mattn/go-sqlite3` but enables
   `CGO_ENABLED=0` builds and simpler cross-compilation.
 - HTMX is vendored at `internal/web/static/js/htmx.min.js` (v2.0.4).
+- **Tailwind v4** standalone CLI (`bin/tailwindcss`, gitignored). Run `make css-install` to
+  download it. Source CSS is `internal/web/static/css/input.css`; the built `app.css` is
+  committed so that `go:embed` works without a Tailwind build step in CI/Docker.
+
+## Theming
+
+Themes are pure CSS via `[data-theme="<name>"]` on `<html>`. All components reference
+CSS custom properties (`--color-primary`, `--color-bg`, etc.) defined per-theme.
+Five themes are available: `auto` (follows system), `light`, `vault` (dark/copper),
+`archives` (parchment/serif), `blueprint` (forest/schematic). Theme selection is stored
+in `localStorage('coppermind-theme')` and applied before first paint to prevent flash.
+To add a theme: define a new `[data-theme="<name>"]` block in `input.css` with all
+`--theme-*` variables, add a button to the picker in `base.html`, and run `make css`.
 
 ## Things That Don't Exist Yet (Intentionally)
 
-- **Tailwind v4 build pipeline** — CSS is currently hand-written in `static/css/app.css`.
-  The `input.css` and Makefile `css` target are placeholders. The design calls for Tailwind v4
-  standalone CLI but it hasn't been wired up yet.
 - **Format conversion** — No EPUB→MOBI (KindleGen is discontinued). Modern Kindles read EPUB.
 - **External metadata lookup** — Open Library, Google Books APIs are future work.
 - **Full-text search** — Only metadata search is implemented.

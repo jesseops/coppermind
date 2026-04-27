@@ -29,9 +29,19 @@ clean:
 	rm -f $(TAILWIND_OUTPUT)
 
 css:
-	@echo "Tailwind CSS build (placeholder — will be configured in task 18)"
+	@echo "Building Tailwind CSS..."
 	@mkdir -p internal/web/static/css
-	@touch $(TAILWIND_OUTPUT)
+	./bin/tailwindcss --input $(TAILWIND_INPUT) --output $(TAILWIND_OUTPUT) --minify
+
+css-watch:
+	./bin/tailwindcss --input $(TAILWIND_INPUT) --output $(TAILWIND_OUTPUT) --watch
+
+css-install:
+	@echo "Downloading Tailwind v4 standalone CLI..."
+	@mkdir -p bin
+	curl -sL "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-$$(uname -s | tr '[:upper:]' '[:lower:]')-x64" -o ./bin/tailwindcss
+	chmod +x ./bin/tailwindcss
+	@./bin/tailwindcss --help 2>&1 | head -1
 
 dev: css build
 	./$(BINARY) serve
