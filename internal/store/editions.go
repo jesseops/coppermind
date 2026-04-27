@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jesseops/coppermind/internal/domain"
 )
@@ -98,65 +97,49 @@ func (s *SQLiteStore) ListEditions(workID int64) ([]domain.Edition, error) {
 }
 
 func (s *SQLiteStore) UpdateEdition(id int64, updates EditionUpdate) error {
-	clauses := []string{}
-	args := []any{}
+	ub := newUpdateBuilder("editions")
 
 	if updates.Format != nil {
-		clauses = append(clauses, "format = ?")
-		args = append(args, nullOrEmpty(*updates.Format))
+		ub.Set("format", nullOrEmpty(*updates.Format))
 	}
 	if updates.ISBN != nil {
-		clauses = append(clauses, "isbn = ?")
-		args = append(args, nullOrEmpty(*updates.ISBN))
+		ub.Set("isbn", nullOrEmpty(*updates.ISBN))
 	}
 	if updates.Publisher != nil {
-		clauses = append(clauses, "publisher = ?")
-		args = append(args, nullOrEmpty(*updates.Publisher))
+		ub.Set("publisher", nullOrEmpty(*updates.Publisher))
 	}
 	if updates.PublishedYear != nil {
-		clauses = append(clauses, "published_year = ?")
-		args = append(args, nullOrZeroInt(*updates.PublishedYear))
+		ub.Set("published_year", nullOrZeroInt(*updates.PublishedYear))
 	}
 	if updates.Narrator != nil {
-		clauses = append(clauses, "narrator = ?")
-		args = append(args, nullOrEmpty(*updates.Narrator))
+		ub.Set("narrator", nullOrEmpty(*updates.Narrator))
 	}
 	if updates.DurationSeconds != nil {
-		clauses = append(clauses, "duration_seconds = ?")
-		args = append(args, nullOrZeroInt(*updates.DurationSeconds))
+		ub.Set("duration_seconds", nullOrZeroInt(*updates.DurationSeconds))
 	}
 	if updates.FilePath != nil {
-		clauses = append(clauses, "file_path = ?")
-		args = append(args, nullOrEmpty(*updates.FilePath))
+		ub.Set("file_path", nullOrEmpty(*updates.FilePath))
 	}
 	if updates.FileHash != nil {
-		clauses = append(clauses, "file_hash = ?")
-		args = append(args, nullOrEmpty(*updates.FileHash))
+		ub.Set("file_hash", nullOrEmpty(*updates.FileHash))
 	}
 	if updates.FileSize != nil {
-		clauses = append(clauses, "file_size = ?")
-		args = append(args, nullOrZeroInt64(*updates.FileSize))
+		ub.Set("file_size", nullOrZeroInt64(*updates.FileSize))
 	}
 	if updates.CoverPath != nil {
-		clauses = append(clauses, "cover_path = ?")
-		args = append(args, nullOrEmpty(*updates.CoverPath))
+		ub.Set("cover_path", nullOrEmpty(*updates.CoverPath))
 	}
 	if updates.Notes != nil {
-		clauses = append(clauses, "notes = ?")
-		args = append(args, nullOrEmpty(*updates.Notes))
+		ub.Set("notes", nullOrEmpty(*updates.Notes))
 	}
 	if updates.Status != nil {
-		clauses = append(clauses, "status = ?")
-		args = append(args, *updates.Status)
+		ub.Set("status", *updates.Status)
 	}
 
-	if len(clauses) == 0 {
+	q, args, ok := ub.SQL("id = ?", id)
+	if !ok {
 		return nil
 	}
-
-	clauses = append(clauses, "updated_at = datetime('now')")
-	args = append(args, id)
-	q := "UPDATE editions SET " + strings.Join(clauses, ", ") + " WHERE id = ?"
 	res, err := s.db.Exec(q, args...)
 	if err != nil {
 		return err

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jesseops/coppermind/internal/domain"
 )
@@ -69,33 +68,25 @@ func (s *SQLiteStore) ListUsers() ([]domain.User, error) {
 }
 
 func (s *SQLiteStore) UpdateUser(id int64, updates UserUpdate) error {
-	clauses := []string{}
-	args := []any{}
+	ub := newUpdateBuilder("users")
 
 	if updates.DisplayName != nil {
-		clauses = append(clauses, "display_name = ?")
-		args = append(args, *updates.DisplayName)
+		ub.Set("display_name", *updates.DisplayName)
 	}
 	if updates.PasswordHash != nil {
-		clauses = append(clauses, "password_hash = ?")
-		args = append(args, *updates.PasswordHash)
+		ub.Set("password_hash", *updates.PasswordHash)
 	}
 	if updates.Role != nil {
-		clauses = append(clauses, "role = ?")
-		args = append(args, *updates.Role)
+		ub.Set("role", *updates.Role)
 	}
 	if updates.KindleEmail != nil {
-		clauses = append(clauses, "kindle_email = ?")
-		args = append(args, *updates.KindleEmail)
+		ub.Set("kindle_email", *updates.KindleEmail)
 	}
 
-	if len(clauses) == 0 {
+	q, args, ok := ub.SQL("id = ?", id)
+	if !ok {
 		return nil
 	}
-
-	clauses = append(clauses, "updated_at = datetime('now')")
-	args = append(args, id)
-	q := "UPDATE users SET " + strings.Join(clauses, ", ") + " WHERE id = ?"
 	res, err := s.db.Exec(q, args...)
 	if err != nil {
 		return err
