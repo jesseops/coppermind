@@ -58,8 +58,8 @@
   --theme-error: #B91C1C;
   --theme-shadow: rgba(0, 0, 0, 0.08);
   --theme-hover-glow: rgba(30, 58, 138, 0.15);
-  --theme-font-body: "Crimson Text", Georgia, "Times New Roman", serif;
-  --theme-font-heading: "Crimson Text", Georgia, "Times New Roman", serif;
+  --theme-font-body: "Lora", Georgia, "Times New Roman", serif;
+  --theme-font-heading: "Cormorant Garamond", "Garamond", Georgia, serif;
   --theme-font-size-base: 1rem;
 
   color-scheme: light;
