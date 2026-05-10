@@ -4,11 +4,35 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/jesseops/coppermind/internal/domain"
 )
+
+type userRow struct {
+	ID           int64  `db:"id"`
+	Username     string `db:"username"`
+	DisplayName  string `db:"display_name"`
+	PasswordHash string `db:"password_hash"`
+	Role         string `db:"role"`
+	KindleEmail  string `db:"kindle_email"`
+	CreatedAt    string `db:"created_at"`
+	UpdatedAt    string `db:"updated_at"`
+}
+
+func (r userRow) toDomain() domain.User {
+	return domain.User{
+		ID:           r.ID,
+		Username:     r.Username,
+		DisplayName:  r.DisplayName,
+		PasswordHash: r.PasswordHash,
+		Role:         r.Role,
+		KindleEmail:  r.KindleEmail,
+		CreatedAt:    parseDBTime(r.CreatedAt),
+		UpdatedAt:    parseDBTime(r.UpdatedAt),
+	}
+}
+
+const userColumns = `id, username, display_name, password_hash, role, kindle_email, created_at, updated_at`
 
 func (s *SQLiteStore) CreateUser(username, displayName, passwordHash, role string) (*domain.User, error) {
 	res, err := s.db.Exec(
@@ -23,68 +47,51 @@ func (s *SQLiteStore) CreateUser(username, displayName, passwordHash, role strin
 }
 
 func (s *SQLiteStore) GetUser(id int64) (*domain.User, error) {
-	return s.scanUser("SELECT id, username, display_name, password_hash, role, kindle_email, created_at, updated_at FROM users WHERE id = ?", id)
+	return s.scanUser("SELECT "+userColumns+" FROM users WHERE id = ?", id)
 }
 
 func (s *SQLiteStore) GetUserByUsername(username string) (*domain.User, error) {
-	return s.scanUser("SELECT id, username, display_name, password_hash, role, kindle_email, created_at, updated_at FROM users WHERE username = ?", username)
+	return s.scanUser("SELECT "+userColumns+" FROM users WHERE username = ?", username)
 }
 
 func (s *SQLiteStore) ListUsers() ([]domain.User, error) {
-	rows, err := s.db.Query("SELECT id, username, display_name, password_hash, role, kindle_email, created_at, updated_at FROM users ORDER BY username")
-	if err != nil {
+	var rows []userRow
+	if err := s.db.Select(&rows, "SELECT "+userColumns+" FROM users ORDER BY username"); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var users []domain.User
-	for rows.Next() {
-		u, err := scanUserRow(rows)
-		if err != nil {
-			return nil, err
-		}
-		users = append(users, *u)
+	users := make([]domain.User, 0, len(rows))
+	for _, row := range rows {
+		users = append(users, row.toDomain())
 	}
-	return users, rows.Err()
+	return users, nil
 }
 
 func (s *SQLiteStore) UpdateUser(id int64, updates UserUpdate) error {
-	clauses := []string{}
-	args := []any{}
+	ub := newUpdateBuilder("users")
 
 	if updates.DisplayName != nil {
-		clauses = append(clauses, "display_name = ?")
-		args = append(args, *updates.DisplayName)
+		ub.Set("display_name", *updates.DisplayName)
 	}
 	if updates.PasswordHash != nil {
-		clauses = append(clauses, "password_hash = ?")
-		args = append(args, *updates.PasswordHash)
+		ub.Set("password_hash", *updates.PasswordHash)
 	}
 	if updates.Role != nil {
-		clauses = append(clauses, "role = ?")
-		args = append(args, *updates.Role)
+		ub.Set("role", *updates.Role)
 	}
 	if updates.KindleEmail != nil {
-		clauses = append(clauses, "kindle_email = ?")
-		args = append(args, *updates.KindleEmail)
+		ub.Set("kindle_email", *updates.KindleEmail)
 	}
 
-	if len(clauses) == 0 {
+	q, args, ok := ub.SQL("id = ?", id)
+	if !ok {
 		return nil
 	}
-
-	clauses = append(clauses, "updated_at = datetime('now')")
-	args = append(args, id)
-	q := "UPDATE users SET " + strings.Join(clauses, ", ") + " WHERE id = ?"
 	res, err := s.db.Exec(q, args...)
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("user %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "user", id)
 }
 
 func (s *SQLiteStore) DeleteUser(id int64) error {
@@ -92,11 +99,7 @@ func (s *SQLiteStore) DeleteUser(id int64) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("user %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "user", id)
 }
 
 func (s *SQLiteStore) CountUsers() (int, error) {
@@ -108,38 +111,13 @@ func (s *SQLiteStore) CountUsers() (int, error) {
 // ── scan helpers ────────────────────────────────────────────────────
 
 func (s *SQLiteStore) scanUser(query string, args ...any) (*domain.User, error) {
-	var u domain.User
-	var createdAt, updatedAt string
-	err := s.db.QueryRow(query, args...).Scan(
-		&u.ID, &u.Username, &u.DisplayName, &u.PasswordHash, &u.Role, &u.KindleEmail,
-		&createdAt, &updatedAt,
-	)
-	if err != nil {
+	var row userRow
+	if err := s.db.Get(&row, query, args...); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("user not found")
+			return nil, notFound("user", "")
 		}
 		return nil, err
 	}
-	u.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	u.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
-	return &u, nil
-}
-
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
-func scanUserRow(row rowScanner) (*domain.User, error) {
-	var u domain.User
-	var createdAt, updatedAt string
-	err := row.Scan(
-		&u.ID, &u.Username, &u.DisplayName, &u.PasswordHash, &u.Role, &u.KindleEmail,
-		&createdAt, &updatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-	u.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
-	u.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
+	u := row.toDomain()
 	return &u, nil
 }

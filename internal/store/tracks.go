@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -36,7 +37,10 @@ func (s *SQLiteStore) GetTrack(id int64) (*domain.Track, error) {
 		&t.FilePath, &fileHash, &createdAt,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("track %d not found", id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, notFound("track", id)
+		}
+		return nil, err
 	}
 	t.Title = title.String
 	t.DurationSeconds = int(duration.Int64)

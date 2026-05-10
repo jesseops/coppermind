@@ -1,7 +1,5 @@
 package store
 
-import "github.com/jesseops/coppermind/internal/domain"
-
 func (s *SQLiteStore) AddTag(workID int64, tag string) error {
 	_, err := s.db.Exec(
 		"INSERT OR IGNORE INTO work_tags (work_id, tag) VALUES (?, ?)",
@@ -58,9 +56,3 @@ func (s *SQLiteStore) ListAllTags(libraryID int64) ([]TagWithCount, error) {
 	}
 	return tags, rows.Err()
 }
-
-// Ensure SQLiteStore implements Store at compile time.
-var _ Store = (*SQLiteStore)(nil)
-
-// Ensure domain import is used (referenced in tags.go for the var _ line).
-var _ = domain.RoleAdmin

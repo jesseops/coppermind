@@ -36,7 +36,7 @@ func (s *SQLiteStore) GetShelf(id int64) (*domain.Shelf, error) {
 	).Scan(&sh.ID, &sh.UserID, &sh.Name, &desc, &isPublic, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("shelf %d not found", id)
+			return nil, notFound("shelf", id)
 		}
 		return nil, err
 	}
@@ -81,11 +81,7 @@ func (s *SQLiteStore) DeleteShelf(id int64) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("shelf %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "shelf", id)
 }
 
 func (s *SQLiteStore) AddToShelf(shelfID, workID int64) error {

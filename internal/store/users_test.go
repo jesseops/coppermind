@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -91,11 +92,11 @@ func TestUserNotFound(t *testing.T) {
 	s := newTestStore(t)
 
 	_, err := s.GetUser(999)
-	if err == nil {
-		t.Error("expected error for non-existent user")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetUser error = %v, want ErrNotFound", err)
 	}
 	_, err = s.GetUserByUsername("nobody")
-	if err == nil {
-		t.Error("expected error for non-existent username")
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("GetUserByUsername error = %v, want ErrNotFound", err)
 	}
 }

@@ -14,12 +14,12 @@ import (
 
 // Importer orchestrates the full import pipeline.
 type Importer struct {
-	store   store.Store
+	store   store.ImportStore
 	dataDir string
 }
 
 // NewImporter creates a new Importer.
-func NewImporter(s store.Store, dataDir string) *Importer {
+func NewImporter(s store.ImportStore, dataDir string) *Importer {
 	return &Importer{store: s, dataDir: dataDir}
 }
 
@@ -138,17 +138,17 @@ func (imp *Importer) Import(input ImportInput) (*ImportResult, error) {
 
 	// 6. Create edition.
 	edition := &domain.Edition{
-		WorkID:      match.Work.ID,
-		EditionType: editionType,
-		Format:      meta.Format,
-		ISBN:        meta.ISBN,
-		Publisher:   meta.Publisher,
+		WorkID:        match.Work.ID,
+		EditionType:   editionType,
+		Format:        meta.Format,
+		ISBN:          meta.ISBN,
+		Publisher:     meta.Publisher,
 		PublishedYear: meta.PublishedYear,
-		FilePath:    destPath,
-		FileHash:    fileHash,
-		FileSize:    fileSize(info),
-		CoverPath:   coverPath,
-		Status:      domain.EditionStatusActive,
+		FilePath:      destPath,
+		FileHash:      fileHash,
+		FileSize:      fileSize(info),
+		CoverPath:     coverPath,
+		Status:        domain.EditionStatusActive,
 	}
 	if err := imp.store.CreateEdition(edition); err != nil {
 		return nil, fmt.Errorf("create edition: %w", err)

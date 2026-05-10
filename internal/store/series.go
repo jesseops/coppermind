@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jesseops/coppermind/internal/domain"
@@ -27,7 +26,7 @@ func (s *SQLiteStore) GetSeries(id int64) (*domain.Series, error) {
 		Scan(&ser.ID, &ser.Name, &desc, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("series %d not found", id)
+			return nil, notFound("series", id)
 		}
 		return nil, err
 	}
@@ -79,12 +78,4 @@ func (s *SQLiteStore) ListSeries(libraryID int64) ([]SeriesWithCount, error) {
 		result = append(result, sc)
 	}
 	return result, rows.Err()
-}
-
-// nullOrEmpty returns nil for empty strings, the string otherwise.
-func nullOrEmpty(s string) any {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	return s
 }

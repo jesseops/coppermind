@@ -76,63 +76,48 @@ func (s *SQLiteStore) GetWork(id int64) (*domain.Work, error) {
 }
 
 func (s *SQLiteStore) UpdateWork(id int64, updates WorkUpdate) error {
-	clauses := []string{}
-	args := []any{}
+	ub := newUpdateBuilder("works")
 
 	if updates.Title != nil {
 		title := strings.TrimSpace(*updates.Title)
-		clauses = append(clauses, "title = ?", "sort_title = ?")
-		args = append(args, title, domain.GenerateSortTitle(title))
+		ub.Set("title", title)
+		ub.Set("sort_title", domain.GenerateSortTitle(title))
 	}
 	if updates.Description != nil {
-		clauses = append(clauses, "description = ?")
-		args = append(args, nullOrEmpty(*updates.Description))
+		ub.Set("description", nullOrEmpty(*updates.Description))
 	}
 	if updates.SeriesID != nil {
-		clauses = append(clauses, "series_id = ?")
-		args = append(args, nullOrZeroInt64(*updates.SeriesID))
+		ub.Set("series_id", nullOrZeroInt64(*updates.SeriesID))
 	}
 	if updates.SeriesIndex != nil {
-		clauses = append(clauses, "series_index = ?")
-		args = append(args, *updates.SeriesIndex)
+		ub.Set("series_index", *updates.SeriesIndex)
 	}
 	if updates.Language != nil {
-		clauses = append(clauses, "language = ?")
-		args = append(args, nullOrEmpty(*updates.Language))
+		ub.Set("language", nullOrEmpty(*updates.Language))
 	}
 	if updates.FirstPublished != nil {
-		clauses = append(clauses, "first_published = ?")
-		args = append(args, nullOrZeroInt(*updates.FirstPublished))
+		ub.Set("first_published", nullOrZeroInt(*updates.FirstPublished))
 	}
 	if updates.CoverPath != nil {
-		clauses = append(clauses, "cover_path = ?")
-		args = append(args, nullOrEmpty(*updates.CoverPath))
+		ub.Set("cover_path", nullOrEmpty(*updates.CoverPath))
 	}
 	if updates.Hidden != nil {
 		h := 0
 		if *updates.Hidden {
 			h = 1
 		}
-		clauses = append(clauses, "hidden = ?")
-		args = append(args, h)
+		ub.Set("hidden", h)
 	}
 
-	if len(clauses) == 0 {
+	q, args, ok := ub.SQL("id = ?", id)
+	if !ok {
 		return nil
 	}
-
-	clauses = append(clauses, "updated_at = datetime('now')")
-	args = append(args, id)
-	q := "UPDATE works SET " + strings.Join(clauses, ", ") + " WHERE id = ?"
 	res, err := s.db.Exec(q, args...)
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("work %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "work", id)
 }
 
 func (s *SQLiteStore) DeleteWork(id int64) error {
@@ -141,11 +126,7 @@ func (s *SQLiteStore) DeleteWork(id int64) error {
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return fmt.Errorf("work %d not found", id)
-	}
-	return nil
+	return checkRowsAffected(res, "work", id)
 }
 
 // MergeWorks moves all editions and relationships from source works into targetID,
@@ -168,7 +149,7 @@ func (s *SQLiteStore) MergeWorks(targetID int64, sourceIDs []int64) error {
 	var targetLibraryID int64
 	if err := tx.QueryRow("SELECT library_id FROM works WHERE id = ?", targetID).Scan(&targetLibraryID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("target work %d not found", targetID)
+			return notFound("target work", targetID)
 		}
 		return err
 	}
@@ -181,7 +162,7 @@ func (s *SQLiteStore) MergeWorks(targetID int64, sourceIDs []int64) error {
 		var sourceLibraryID int64
 		if err := tx.QueryRow("SELECT library_id FROM works WHERE id = ?", sourceID).Scan(&sourceLibraryID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("source work %d not found", sourceID)
+				return notFound("source work", sourceID)
 			}
 			return err
 		}
@@ -244,64 +225,59 @@ func (s *SQLiteStore) FindWorkByTitleAndAuthor(libraryID int64, sortTitle, autho
 }
 
 func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
-	where := []string{"w.library_id = ?"}
-	args := []any{filter.LibraryID}
+	var where whereBuilder
+	where.And("w.library_id = ?", filter.LibraryID)
 
 	if filter.Query != "" {
 		pattern := "%" + filter.Query + "%"
-		where = append(where, `(w.title LIKE ? OR w.sort_title LIKE ? OR EXISTS (
+		where.And(`(w.title LIKE ? OR w.sort_title LIKE ? OR EXISTS (
 			SELECT 1 FROM work_authors wa2 JOIN authors a2 ON a2.id = wa2.author_id
 			WHERE wa2.work_id = w.id AND a2.name LIKE ?
-		))`)
-		args = append(args, pattern, pattern, pattern)
+		))`, pattern, pattern, pattern)
 	}
 	if filter.Type != "" {
-		where = append(where, `EXISTS (
+		where.And(`EXISTS (
 			SELECT 1 FROM editions e WHERE e.work_id = w.id AND e.edition_type = ? AND e.status = 'active'
-		)`)
-		args = append(args, filter.Type)
+		)`, filter.Type)
 	}
 	if filter.SeriesID > 0 {
-		where = append(where, "w.series_id = ?")
-		args = append(args, filter.SeriesID)
+		where.And("w.series_id = ?", filter.SeriesID)
 	}
 	if filter.AuthorID > 0 {
-		where = append(where, `EXISTS (
+		where.And(`EXISTS (
 			SELECT 1 FROM work_authors wa3 WHERE wa3.work_id = w.id AND wa3.author_id = ?
-		)`)
-		args = append(args, filter.AuthorID)
+		)`, filter.AuthorID)
 	}
 	if filter.ShelfID > 0 {
-		where = append(where, `EXISTS (
+		where.And(`EXISTS (
 			SELECT 1 FROM shelf_works sw WHERE sw.work_id = w.id AND sw.shelf_id = ?
-		)`)
-		args = append(args, filter.ShelfID)
+		)`, filter.ShelfID)
 	}
 	if !filter.IncludeHidden && !filter.OnlyHidden {
-		where = append(where, "w.hidden = 0")
+		where.And("w.hidden = 0")
 	}
 	if filter.OnlyHidden {
-		where = append(where, "w.hidden = 1")
+		where.And("w.hidden = 1")
 	}
 	if filter.MissingCover {
-		where = append(where, "(w.cover_path IS NULL OR w.cover_path = '')")
+		where.And("(w.cover_path IS NULL OR w.cover_path = '')")
 	}
 	if filter.MissingAuthor {
-		where = append(where, `NOT EXISTS (
+		where.And(`NOT EXISTS (
 			SELECT 1 FROM work_authors wa4 WHERE wa4.work_id = w.id
 		)`)
 	}
 	if filter.MissingDesc {
-		where = append(where, "(w.description IS NULL OR w.description = '')")
+		where.And("(w.description IS NULL OR w.description = '')")
 	}
 	if filter.Format != "" {
-		where = append(where, `EXISTS (
+		where.And(`EXISTS (
 			SELECT 1 FROM editions e2 WHERE e2.work_id = w.id AND e2.format = ? AND e2.status = 'active'
-		)`)
-		args = append(args, filter.Format)
+		)`, filter.Format)
 	}
 
-	whereClause := strings.Join(where, " AND ")
+	whereClause := where.SQL()
+	args := where.Args()
 
 	// Count.
 	countQ := "SELECT COUNT(*) FROM works w WHERE " + whereClause
@@ -366,34 +342,155 @@ func (s *SQLiteStore) ListWorks(filter WorkFilter) ([]domain.Work, int, error) {
 	}
 	rows.Close()
 
-	// Now populate denormalized fields with the connection free.
-	for i := range works {
-		w := &works[i]
-		authors, _ := s.GetWorkAuthors(w.ID)
-		w.Authors = authors
-		if w.SeriesID > 0 {
-			if ser, err := s.GetSeries(w.SeriesID); err == nil {
-				w.SeriesName = ser.Name
-			}
-		}
-		// Edition type flags.
-		edRows, _ := s.db.Query(
-			"SELECT DISTINCT edition_type FROM editions WHERE work_id = ? AND status = 'active'", w.ID)
-		if edRows != nil {
-			for edRows.Next() {
-				var et string
-				edRows.Scan(&et)
-				if et == domain.EditionTypeEbook {
-					w.HasEbook = true
-				}
-				if et == domain.EditionTypeAudiobook {
-					w.HasAudiobook = true
-				}
-			}
-			edRows.Close()
-		}
+	if err := s.enrichWorks(works); err != nil {
+		return nil, 0, err
 	}
 	return works, total, nil
+}
+
+func (s *SQLiteStore) enrichWorks(works []domain.Work) error {
+	if len(works) == 0 {
+		return nil
+	}
+
+	workIDs := make([]int64, 0, len(works))
+	seriesIDs := make([]int64, 0, len(works))
+	seenSeries := map[int64]bool{}
+	for _, w := range works {
+		workIDs = append(workIDs, w.ID)
+		if w.SeriesID > 0 && !seenSeries[w.SeriesID] {
+			seriesIDs = append(seriesIDs, w.SeriesID)
+			seenSeries[w.SeriesID] = true
+		}
+	}
+
+	authorsByWork, err := s.listAuthorsForWorks(workIDs)
+	if err != nil {
+		return err
+	}
+	seriesNames, err := s.listSeriesNames(seriesIDs)
+	if err != nil {
+		return err
+	}
+	editionStats, err := s.listEditionStatsForWorks(workIDs)
+	if err != nil {
+		return err
+	}
+
+	for i := range works {
+		w := &works[i]
+		w.Authors = authorsByWork[w.ID]
+		w.SeriesName = seriesNames[w.SeriesID]
+		stats := editionStats[w.ID]
+		w.EditionCount = stats.count
+		w.HasEbook = stats.hasEbook
+		w.HasAudiobook = stats.hasAudiobook
+	}
+	return nil
+}
+
+func (s *SQLiteStore) listAuthorsForWorks(workIDs []int64) (map[int64][]domain.WorkAuthor, error) {
+	result := make(map[int64][]domain.WorkAuthor, len(workIDs))
+	if len(workIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(workIDs))
+	for i, id := range workIDs {
+		args[i] = id
+	}
+	rows, err := s.db.Query(`
+		SELECT wa.work_id, wa.author_id, wa.role, a.name
+		FROM work_authors wa
+		JOIN authors a ON a.id = wa.author_id
+		WHERE wa.work_id IN (`+placeholders(len(workIDs))+`)
+		ORDER BY wa.work_id, wa.role, a.sort_name`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var wa domain.WorkAuthor
+		if err := rows.Scan(&wa.WorkID, &wa.AuthorID, &wa.Role, &wa.AuthorName); err != nil {
+			return nil, err
+		}
+		result[wa.WorkID] = append(result[wa.WorkID], wa)
+	}
+	return result, rows.Err()
+}
+
+func (s *SQLiteStore) listSeriesNames(seriesIDs []int64) (map[int64]string, error) {
+	result := make(map[int64]string, len(seriesIDs))
+	if len(seriesIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(seriesIDs))
+	for i, id := range seriesIDs {
+		args[i] = id
+	}
+	rows, err := s.db.Query(`SELECT id, name FROM series WHERE id IN (`+placeholders(len(seriesIDs))+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		result[id] = name
+	}
+	return result, rows.Err()
+}
+
+type editionStats struct {
+	count        int
+	hasEbook     bool
+	hasAudiobook bool
+}
+
+func (s *SQLiteStore) listEditionStatsForWorks(workIDs []int64) (map[int64]editionStats, error) {
+	result := make(map[int64]editionStats, len(workIDs))
+	if len(workIDs) == 0 {
+		return result, nil
+	}
+
+	args := make([]any, len(workIDs))
+	for i, id := range workIDs {
+		args[i] = id
+	}
+	rows, err := s.db.Query(`
+		SELECT work_id, edition_type, COUNT(*)
+		FROM editions
+		WHERE status = 'active' AND work_id IN (`+placeholders(len(workIDs))+`)
+		GROUP BY work_id, edition_type`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var workID int64
+		var editionType string
+		var count int
+		if err := rows.Scan(&workID, &editionType, &count); err != nil {
+			return nil, err
+		}
+		stats := result[workID]
+		stats.count += count
+		switch editionType {
+		case domain.EditionTypeEbook:
+			stats.hasEbook = true
+		case domain.EditionTypeAudiobook:
+			stats.hasAudiobook = true
+		}
+		result[workID] = stats
+	}
+	return result, rows.Err()
 }
 
 // ── scan helpers ────────────────────────────────────────────────────
@@ -403,7 +500,7 @@ func (s *SQLiteStore) scanWork(query string, args ...any) (*domain.Work, error) 
 	w, err := scanWorkFromRow(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("work not found")
+			return nil, notFound("work", "")
 		}
 		return nil, err
 	}
@@ -474,27 +571,4 @@ func scanWorkRow(rows *sql.Rows) (*domain.Work, error) {
 	w.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdAt)
 	w.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedAt)
 	return &w, nil
-}
-
-// ── null helpers ────────────────────────────────────────────────────
-
-func nullOrZeroInt64(v int64) any {
-	if v == 0 {
-		return nil
-	}
-	return v
-}
-
-func nullOrZeroFloat(v float64) any {
-	if v == 0 {
-		return nil
-	}
-	return v
-}
-
-func nullOrZeroInt(v int) any {
-	if v == 0 {
-		return nil
-	}
-	return v
 }

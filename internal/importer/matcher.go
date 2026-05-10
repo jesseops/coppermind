@@ -17,11 +17,11 @@ type MatchResult struct {
 
 // Matcher matches extracted metadata to existing or new entities in the store.
 type Matcher struct {
-	store store.Store
+	store store.ImportStore
 }
 
 // NewMatcher creates a new Matcher.
-func NewMatcher(s store.Store) *Matcher {
+func NewMatcher(s store.ImportStore) *Matcher {
 	return &Matcher{store: s}
 }
 
@@ -104,7 +104,7 @@ func (m *Matcher) Match(meta *Extracted, libraryID int64, fileHash string) (*Mat
 		Title:          meta.Title,
 		SortTitle:      sortTitle,
 		Description:    meta.Description,
-		Language:        meta.Language,
+		Language:       meta.Language,
 		FirstPublished: meta.PublishedYear,
 	}
 	if result.Series != nil {

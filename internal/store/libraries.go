@@ -25,7 +25,7 @@ func (s *SQLiteStore) GetLibrary(id int64) (*domain.Library, error) {
 		Scan(&lib.ID, &lib.Name, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("library %d not found", id)
+			return nil, notFound("library", id)
 		}
 		return nil, err
 	}
